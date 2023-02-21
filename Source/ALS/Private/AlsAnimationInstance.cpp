@@ -25,12 +25,12 @@ void UAlsAnimationInstance::NativeInitializeAnimation()
 	AlsComponent = UAlsComponent::FindAlsComponent(GetOwningActor());
 
 #if WITH_EDITOR
-	// if (!GetWorld()->IsGameWorld() && !IsValid(Character))
-	// {
-	// 	// Use default objects for editor preview.
-	//
-	// 	Character = GetMutableDefault<ACharacter>();
-	// }
+	 if (!GetWorld()->IsGameWorld() && !IsValid(Character))
+	 {
+	 	// Use default objects for editor preview.
+	
+	 	Character = GetMutableDefault<ACharacter>();
+	 }
 	if (!GetWorld()->IsGameWorld() && !IsValid(AlsComponent))
 	{
 		// Use default objects for editor preview.

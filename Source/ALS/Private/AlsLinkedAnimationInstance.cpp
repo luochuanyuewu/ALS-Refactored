@@ -31,10 +31,10 @@ void UAlsLinkedAnimationInstance::NativeInitializeAnimation()
 			Parent = GetMutableDefault<UAlsAnimationInstance>();
 		}
 
-		// if (!IsValid(Character))
-		// {
-		// 	Character = GetMutableDefault<ACharacter>();
-		// }
+		if (!IsValid(Character))
+		{
+			Character = GetMutableDefault<ACharacter>();
+		}
 		if (!IsValid(AlsComponent))
 		{
 			AlsComponent = GetMutableDefault<UAlsComponent>();
