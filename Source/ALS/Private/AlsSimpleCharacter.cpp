@@ -29,7 +29,7 @@ void AAlsSimpleCharacter::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo&
 
 bool AAlsSimpleCharacter::CanCrouch() const
 {
-	return AlsComponent->CanCrouch();
+	return Super::CanCrouch();
 }
 
 void AAlsSimpleCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
@@ -68,16 +68,25 @@ void AAlsSimpleCharacter::Restart()
 	AlsComponent->Restart();
 }
 
-void AAlsSimpleCharacter::Jump()
+bool AAlsSimpleCharacter::CanJumpInternal_Implementation() const
 {
-	AlsComponent->Jump();
+	if (AlsComponent->CanJump())
+	{
+		return true;
+	}
+	return Super::CanJumpInternal_Implementation();
 }
-
 
 void AAlsSimpleCharacter::OnJumped_Implementation()
 {
 	Super::OnJumped_Implementation();
-	AlsComponent->OnJumped_Implementation();
+	AlsComponent->OnJumped();
+}
+
+FRotator AAlsSimpleCharacter::GetViewRotation() const
+{
+	// return Super::GetViewRotation();
+	return AlsComponent->GetViewRotation();
 }
 
 // Called every frame

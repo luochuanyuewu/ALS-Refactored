@@ -495,7 +495,10 @@ UAlsMantlingSettings* UAlsComponent::SelectMantlingSettings_Implementation(EAlsM
 	return nullptr;
 }
 
-void UAlsComponent::OnMantlingStarted_Implementation(const FAlsMantlingParameters& Parameters) {}
+void UAlsComponent::OnMantlingStarted_Implementation(const FAlsMantlingParameters& Parameters)
+{
+	OnMantlingStartedEvent.Broadcast(Parameters);
+}
 
 void UAlsComponent::RefreshMantling()
 {
@@ -547,7 +550,10 @@ void UAlsComponent::StopMantling()
 	OnMantlingEnded();
 }
 
-void UAlsComponent::OnMantlingEnded_Implementation() {}
+void UAlsComponent::OnMantlingEnded_Implementation()
+{
+	OnMantlingEndedEvent.Broadcast();
+}
 
 bool UAlsComponent::IsRagdollingAllowedToStart() const
 {
@@ -651,7 +657,10 @@ void UAlsComponent::StartRagdollingImplementation()
 	OnRagdollingStarted();
 }
 
-void UAlsComponent::OnRagdollingStarted_Implementation() {}
+void UAlsComponent::OnRagdollingStarted_Implementation()
+{
+	OnRagdollingStartedEvent.Broadcast();
+}
 
 void UAlsComponent::SetRagdollTargetLocation(const FVector& NewTargetLocation)
 {
@@ -886,4 +895,7 @@ UAnimMontage* UAlsComponent::SelectGetUpMontage_Implementation(const bool bRagdo
 	return bRagdollFacedUpward ? Settings->Ragdolling.GetUpBackMontage : Settings->Ragdolling.GetUpFrontMontage;
 }
 
-void UAlsComponent::OnRagdollingEnded_Implementation() {}
+void UAlsComponent::OnRagdollingEnded_Implementation()
+{
+	OnRagdollingEndedEvent.Broadcast();
+}

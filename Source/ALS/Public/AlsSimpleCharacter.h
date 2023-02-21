@@ -32,8 +32,9 @@ protected:
 	virtual void OnRep_ReplicatedBasedMovement() override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void Restart() override;
-	virtual void Jump() override;
+	virtual bool CanJumpInternal_Implementation() const override;
 	virtual void OnJumped_Implementation() override;
+	virtual FRotator GetViewRotation() const override;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Als Character")
 	TObjectPtr<UAlsComponent> AlsComponent;

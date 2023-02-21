@@ -1,7 +1,8 @@
 #include "AlsCameraAnimationInstance.h"
 
 #include "AlsCameraComponent.h"
-#include "AlsCharacter.h"
+#include "AlsComponent.h"
+#include "GameFramework/Character.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsCameraAnimationInstance)
 
@@ -9,7 +10,8 @@ void UAlsCameraAnimationInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 
-	Character = Cast<AAlsCharacter>(GetOwningActor());
+	Character = Cast<ACharacter>(GetOwningActor());
+	AlsComponent = UAlsComponent::FindAlsComponent(GetOwningActor());
 	Camera = Cast<UAlsCameraComponent>(GetSkelMeshComponent());
 
 #if WITH_EDITOR
@@ -17,9 +19,14 @@ void UAlsCameraAnimationInstance::NativeInitializeAnimation()
 	{
 		// Use default objects for editor preview.
 
-		if (!IsValid(Character))
+		// if (!IsValid(Character))
+		// {
+		// 	Character = GetMutableDefault<ACharacter>();
+		// }
+
+		if (!IsValid(AlsComponent))
 		{
-			Character = GetMutableDefault<AAlsCharacter>();
+			AlsComponent = GetMutableDefault<UAlsComponent>();
 		}
 
 		if (!IsValid(Camera))
@@ -30,21 +37,31 @@ void UAlsCameraAnimationInstance::NativeInitializeAnimation()
 #endif
 }
 
+void UAlsCameraAnimationInstance::NativeBeginPlay()
+{
+	Super::NativeBeginPlay();
+
+	if (!IsValid(AlsComponent))
+	{
+		AlsComponent = UAlsComponent::FindAlsComponent(GetOwningActor());
+	}
+}
+
 void UAlsCameraAnimationInstance::NativeUpdateAnimation(const float DeltaTime)
 {
 	Super::NativeUpdateAnimation(DeltaTime);
 
-	if (!IsValid(Character) || !IsValid(Camera))
+	if (!IsValid(Character) || !IsValid(AlsComponent) || !IsValid(Camera))
 	{
 		return;
 	}
 
-	ViewMode = Character->GetViewMode();
-	LocomotionMode = Character->GetLocomotionMode();
-	RotationMode = Character->GetRotationMode();
-	Stance = Character->GetStance();
-	Gait = Character->GetGait();
-	LocomotionAction = Character->GetLocomotionAction();
+	ViewMode = AlsComponent->GetViewMode();
+	LocomotionMode = AlsComponent->GetLocomotionMode();
+	RotationMode = AlsComponent->GetRotationMode();
+	Stance = AlsComponent->GetStance();
+	Gait = AlsComponent->GetGait();
+	LocomotionAction = AlsComponent->GetLocomotionAction();
 
 	bRightShoulder = Camera->IsRightShoulder();
 }

@@ -1,6 +1,6 @@
 #include "Notifies/AlsAnimNotifyState_SetLocomotionAction.h"
 
-#include "AlsCharacter.h"
+#include "AlsComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Utility/AlsUtility.h"
 
@@ -23,10 +23,11 @@ void UAlsAnimNotifyState_SetLocomotionAction::NotifyBegin(USkeletalMeshComponent
 {
 	Super::NotifyBegin(Mesh, Animation, Duration, EventReference);
 
-	auto* Character{Cast<AAlsCharacter>(Mesh->GetOwner())};
-	if (IsValid(Character))
+	UAlsComponent* AlsComponent{Cast<UAlsComponent>(Mesh->GetOwner())};
+
+	if (IsValid(AlsComponent))
 	{
-		Character->SetLocomotionAction(LocomotionAction);
+		AlsComponent->SetLocomotionAction(LocomotionAction);
 	}
 }
 
@@ -35,10 +36,10 @@ void UAlsAnimNotifyState_SetLocomotionAction::NotifyEnd(USkeletalMeshComponent* 
 {
 	Super::NotifyEnd(Mesh, Animation, EventReference);
 
-	auto* Character{Cast<AAlsCharacter>(Mesh->GetOwner())};
+	UAlsComponent* AlsComponent{Cast<UAlsComponent>(Mesh->GetOwner())};
 
-	if (IsValid(Character) && Character->GetLocomotionAction() == LocomotionAction)
+	if (IsValid(AlsComponent) && AlsComponent->GetLocomotionAction() == LocomotionAction)
 	{
-		Character->SetLocomotionAction(FGameplayTag::EmptyTag);
+		AlsComponent->SetLocomotionAction(FGameplayTag::EmptyTag);
 	}
 }

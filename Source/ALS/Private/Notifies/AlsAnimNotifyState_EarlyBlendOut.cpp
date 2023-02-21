@@ -1,6 +1,6 @@
 #include "Notifies/AlsAnimNotifyState_EarlyBlendOut.h"
 
-#include "AlsCharacter.h"
+#include "AlsComponent.h"
 #include "Animation/AnimInstance.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsAnimNotifyState_EarlyBlendOut)
@@ -26,14 +26,16 @@ void UAlsAnimNotifyState_EarlyBlendOut::NotifyTick(USkeletalMeshComponent* Mesh,
 
 	const auto* Montage{Cast<UAnimMontage>(Animation)};
 	auto* AnimationInstance{IsValid(Montage) ? Mesh->GetAnimInstance() : nullptr};
-	const auto* Character{IsValid(AnimationInstance) ? Cast<AAlsCharacter>(Mesh->GetOwner()) : nullptr};
+	// const auto* Character{IsValid(AnimationInstance) ? Cast<AAlsCharacter>(Mesh->GetOwner()) : nullptr};
+	const UAlsComponent* AlsComponent{IsValid(AnimationInstance) ? Cast<UAlsComponent>(Mesh->GetOwner()) : nullptr};
+
 
 	// ReSharper disable CppRedundantParentheses
-	if (IsValid(Character) &&
-	    ((bCheckInput && Character->GetLocomotionState().bHasInput) ||
-	     (bCheckLocomotionMode && Character->GetLocomotionMode() == LocomotionModeEquals) ||
-	     (bCheckRotationMode && Character->GetRotationMode() == RotationModeEquals) ||
-	     (bCheckStance && Character->GetStance() == StanceEquals)))
+	if (IsValid(AlsComponent) &&
+	    ((bCheckInput && AlsComponent->GetLocomotionState().bHasInput) ||
+	     (bCheckLocomotionMode && AlsComponent->GetLocomotionMode() == LocomotionModeEquals) ||
+	     (bCheckRotationMode && AlsComponent->GetRotationMode() == RotationModeEquals) ||
+	     (bCheckStance && AlsComponent->GetStance() == StanceEquals)))
 	// ReSharper restore CppRedundantParentheses
 	{
 		AnimationInstance->Montage_Stop(BlendOutDuration, Montage);

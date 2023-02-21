@@ -3,7 +3,7 @@
 #include "Animation/AnimInstance.h"
 #include "AlsLinkedAnimationInstance.generated.h"
 
-class AAlsCharacter;
+class UAlsComponent;
 
 UCLASS()
 class ALS_API UAlsLinkedAnimationInstance : public UAnimInstance
@@ -15,7 +15,10 @@ protected:
 	TWeakObjectPtr<UAlsAnimationInstance> Parent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
-	TObjectPtr<AAlsCharacter> Character;
+	TObjectPtr<ACharacter> Character;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
+	TObjectPtr<UAlsComponent> AlsComponent;
 
 public:
 	UAlsLinkedAnimationInstance();

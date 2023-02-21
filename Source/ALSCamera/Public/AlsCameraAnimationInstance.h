@@ -4,7 +4,7 @@
 #include "Utility/AlsGameplayTags.h"
 #include "AlsCameraAnimationInstance.generated.h"
 
-class AAlsCharacter;
+class UAlsComponent;
 class UAlsCameraComponent;
 
 UCLASS()
@@ -14,7 +14,10 @@ class ALSCAMERA_API UAlsCameraAnimationInstance : public UAnimInstance
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
-	TObjectPtr<AAlsCharacter> Character;
+	TObjectPtr<ACharacter> Character;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
+	TObjectPtr<UAlsComponent> AlsComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
 	TObjectPtr<UAlsCameraComponent> Camera;
@@ -42,6 +45,8 @@ protected:
 
 public:
 	virtual void NativeInitializeAnimation() override;
+
+	virtual void NativeBeginPlay() override;
 
 	virtual void NativeUpdateAnimation(float DeltaTime) override;
 };

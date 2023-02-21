@@ -1,6 +1,5 @@
 #include "Notifies/AlsAnimNotify_FootstepEffects.h"
 
-#include "AlsCharacter.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Animation/AnimInstance.h"
 #include "Components/AudioComponent.h"
@@ -14,6 +13,8 @@
 #include "Utility/AlsUtility.h"
 
 // ReSharper disable once CppUnusedIncludeDirective
+#include "AlsComponent.h"
+
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsAnimNotify_FootstepEffects)
 
 FString UAlsAnimNotify_FootstepEffects::GetNotifyName_Implementation() const
@@ -31,9 +32,9 @@ void UAlsAnimNotify_FootstepEffects::Notify(USkeletalMeshComponent* Mesh, UAnimS
 		return;
 	}
 
-	const auto* Character{Cast<AAlsCharacter>(Mesh->GetOwner())};
+	const UAlsComponent* AlsComponent{Cast<UAlsComponent>(Mesh->GetOwner())};
 
-	if (bSkipEffectsWhenInAir && IsValid(Character) && Character->GetLocomotionMode() == AlsLocomotionModeTags::InAir)
+	if (bSkipEffectsWhenInAir && IsValid(AlsComponent) && AlsComponent->GetLocomotionMode() == AlsLocomotionModeTags::InAir)
 	{
 		return;
 	}

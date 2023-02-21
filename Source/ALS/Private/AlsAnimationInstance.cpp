@@ -1,6 +1,6 @@
 #include "AlsAnimationInstance.h"
 
-#include "AlsCharacter.h"
+#include "AlsComponent.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "Components/CapsuleComponent.h"
 #include "Curves/CurveFloat.h"
@@ -21,15 +21,23 @@ void UAlsAnimationInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 
-	Character = Cast<AAlsCharacter>(GetOwningActor());
+	Character = Cast<ACharacter>(GetOwningActor());
+	AlsComponent = UAlsComponent::FindAlsComponent(GetOwningActor());
 
 #if WITH_EDITOR
-	if (!GetWorld()->IsGameWorld() && !IsValid(Character))
+	// if (!GetWorld()->IsGameWorld() && !IsValid(Character))
+	// {
+	// 	// Use default objects for editor preview.
+	//
+	// 	Character = GetMutableDefault<ACharacter>();
+	// }
+	if (!GetWorld()->IsGameWorld() && !IsValid(AlsComponent))
 	{
 		// Use default objects for editor preview.
 
-		Character = GetMutableDefault<AAlsCharacter>();
+		AlsComponent = GetMutableDefault<UAlsComponent>();
 	}
+
 #endif
 }
 
@@ -37,7 +45,12 @@ void UAlsAnimationInstance::NativeBeginPlay()
 {
 	Super::NativeBeginPlay();
 
-	if (!ALS_ENSURE(IsValid(Settings)) || !ALS_ENSURE(IsValid(Character)))
+	if (!IsValid(AlsComponent))
+	{
+		AlsComponent = UAlsComponent::FindAlsComponent(GetOwningActor());
+	}
+
+	if (!ALS_ENSURE(IsValid(Settings)) || !ALS_ENSURE(IsValid(Character)) || !ALS_ENSURE(IsValid(AlsComponent)))
 	{
 		return;
 	}
@@ -83,22 +96,22 @@ void UAlsAnimationInstance::NativeUpdateAnimation(const float DeltaTime)
 		const_cast<FTransform&>(Proxy.GetActorTransform()) = ActorTransform;
 	}
 
-	bTeleported |= Character->IsSimulatedProxyTeleported();
+	bTeleported |= AlsComponent->IsSimulatedProxyTeleported();
 
 #if WITH_EDITORONLY_DATA && ENABLE_DRAW_DEBUG
 	bDisplayDebugTraces = UAlsUtility::ShouldDisplayDebugForActor(Character, UAlsConstants::TracesDisplayName());
 #endif
 
-	ViewMode = Character->GetViewMode();
-	LocomotionMode = Character->GetLocomotionMode();
-	RotationMode = Character->GetRotationMode();
-	Stance = Character->GetStance();
-	Gait = Character->GetGait();
-	OverlayMode = Character->GetOverlayMode();
+	ViewMode = AlsComponent->GetViewMode();
+	LocomotionMode = AlsComponent->GetLocomotionMode();
+	RotationMode = AlsComponent->GetRotationMode();
+	Stance = AlsComponent->GetStance();
+	Gait = AlsComponent->GetGait();
+	OverlayMode = AlsComponent->GetOverlayMode();
 
-	if (LocomotionAction != Character->GetLocomotionAction())
+	if (LocomotionAction != AlsComponent->GetLocomotionAction())
 	{
-		LocomotionAction = Character->GetLocomotionAction();
+		LocomotionAction = AlsComponent->GetLocomotionAction();
 
 		ResetGroundedEntryMode();
 	}
@@ -239,7 +252,7 @@ void UAlsAnimationInstance::RefreshViewOnGameThread()
 {
 	check(IsInGameThread())
 
-	const auto& View{Character->GetViewState()};
+	const auto& View{AlsComponent->GetViewState()};
 
 	ViewState.Rotation = View.Rotation;
 	ViewState.YawSpeed = View.YawSpeed;
@@ -433,7 +446,7 @@ void UAlsAnimationInstance::RefreshLocomotionOnGameThread()
 {
 	check(IsInGameThread())
 
-	const auto& Locomotion{Character->GetLocomotionState()};
+	const auto& Locomotion{AlsComponent->GetLocomotionState()};
 
 	LocomotionState.bHasInput = Locomotion.bHasInput;
 	LocomotionState.InputYawAngle = Locomotion.InputYawAngle;
@@ -1283,7 +1296,7 @@ void UAlsAnimationInstance::PlayTransitionAnimation(UAnimSequenceBase* Animation
 		return;
 	}
 
-	if (bFromStandingIdleOnly && (Character->GetLocomotionState().bMoving || Character->GetStance() != AlsStanceTags::Standing))
+	if (bFromStandingIdleOnly && (AlsComponent->GetLocomotionState().bMoving || AlsComponent->GetStance() != AlsStanceTags::Standing))
 	{
 		return;
 	}
@@ -1673,7 +1686,7 @@ void UAlsAnimationInstance::FinalizeRagdolling() const
 {
 	check(IsInGameThread())
 
-	Character->FinalizeRagdolling();
+	AlsComponent->FinalizeRagdolling();
 }
 
 float UAlsAnimationInstance::GetCurveValueClamped01(const FName& CurveName) const

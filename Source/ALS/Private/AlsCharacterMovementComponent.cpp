@@ -1,6 +1,6 @@
 #include "AlsCharacterMovementComponent.h"
 
-#include "AlsCharacter.h"
+#include "AlsComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Curves/CurveVector.h"
@@ -589,10 +589,10 @@ void UAlsCharacterMovementComponent::MoveAutonomous(const float ClientTimeStamp,
 	{
 		const auto NewControlRotation{Controller->GetControlRotation()};
 
-		auto* Character{Cast<AAlsCharacter>(CharacterOwner)};
-		if (IsValid(Character))
+		UAlsComponent* AlsComponent{UAlsComponent::FindAlsComponent(CharacterOwner)};
+		if (IsValid(AlsComponent))
 		{
-			Character->CorrectViewNetworkSmoothing(NewControlRotation);
+			AlsComponent->CorrectViewNetworkSmoothing(NewControlRotation);
 		}
 
 		PreviousControlRotation = NewControlRotation;

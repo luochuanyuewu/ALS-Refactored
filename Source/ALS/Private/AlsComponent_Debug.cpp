@@ -1,10 +1,12 @@
-﻿#include "AlsComponent.h"
+﻿#include "AlsCharacterMovementComponent.h"
+#include "AlsComponent.h"
 
 #include "DisplayDebugHelpers.h"
 #include "Animation/AnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/Canvas.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Misc/DataValidation.h"
 #include "Utility/AlsConstants.h"
 #include "Utility/AlsMath.h"
 #include "Utility/AlsUtility.h"
@@ -575,5 +577,26 @@ void UAlsComponent::DisplayDebugMantling(const UCanvas* Canvas, const float Scal
 
 	VerticalLocation += RowOffset;
 }
+
+#if WITH_EDITOR
+EDataValidationResult UAlsComponent::IsDataValid(FDataValidationContext& Context)
+{
+	const ACharacter* Character = Cast<ACharacter>(GetOwner());
+	if (Character == nullptr)
+	{
+		Context.AddError(FText::FromString(TEXT("Als component intend to be used with Character.")));
+		return EDataValidationResult::Invalid;
+	}
+
+	const UAlsCharacterMovementComponent* MovementComponent = Cast<UAlsCharacterMovementComponent>(Character->GetMovementComponent());
+	if (MovementComponent == nullptr)
+	{
+		Context.AddError(FText::FromString(TEXT("Als component intend to be paired with AlsCharacterMovementComponent.")));
+		return EDataValidationResult::Invalid;
+	}
+	
+	return Super::IsDataValid(Context);
+}
+#endif
 
 #undef LOCTEXT_NAMESPACE

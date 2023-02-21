@@ -25,8 +25,6 @@ UAlsComponent::UAlsComponent(const FObjectInitializer& ObjectInitializer) : Supe
 	SetIsReplicatedByDefault(true);
 	PrimaryComponentTick.bCanEverTick = true;
 
-
-
 	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
 	{
 		// bUseControllerRotationYaw = false;
@@ -122,32 +120,47 @@ void UAlsComponent::OnRegister()
 	}
 }
 
-void UAlsComponent::InitializeComponent()
+UAlsComponent* UAlsComponent::FindAlsComponent(const AActor* Actor)
 {
-	RefreshVisibilityBasedAnimTickOption();
+	return Actor != nullptr ? Actor->FindComponentByClass<UAlsComponent>():nullptr;
 
-	// Make sure the mesh and animation blueprint update after the character to guarantee it gets the most recent values.
+}
 
-	OwnerCharacter->GetMesh()->AddTickPrerequisiteComponent(this);
-
-	AlsCharacterMovement->OnPhysicsRotation.AddUObject(this, &ThisClass::CharacterMovement_OnPhysicsRotation);
-
-	// Pass current movement settings to the movement component.
-
-	AlsCharacterMovement->SetMovementSettings(MovementSettings);
-
-	AnimationInstance = Cast<UAlsAnimationInstance>(OwnerCharacter->GetMesh()->GetAnimInstance());
-
-	Super::InitializeComponent();
-
-	// Use absolute mesh rotation to be able to synchronize character rotation with
-	// rotation animations by updating the mesh rotation only from the animation instance.
-
-	OwnerCharacter->GetMesh()->SetUsingAbsoluteRotation(true);
+bool UAlsComponent::K2_FindAlsComponent(const AActor* Actor, UAlsComponent*& Instance)
+{
+	if (Actor == nullptr)
+		return false;
+	Instance = FindAlsComponent(Actor);
+	return Instance != nullptr;
 }
 
 void UAlsComponent::BeginPlay()
 {
+	//Post InitializeComponent
+	{
+		RefreshVisibilityBasedAnimTickOption();
+
+		// Make sure the mesh and animation blueprint update after the character to guarantee it gets the most recent values.
+
+		OwnerCharacter->GetMesh()->AddTickPrerequisiteComponent(this);
+
+		AlsCharacterMovement = Cast<UAlsCharacterMovementComponent>(OwnerCharacter->GetCharacterMovement());
+		
+		AlsCharacterMovement->OnPhysicsRotation.AddUObject(this, &ThisClass::CharacterMovement_OnPhysicsRotation);
+
+		// Pass current movement settings to the movement component.
+
+		AlsCharacterMovement->SetMovementSettings(MovementSettings);
+
+		AnimationInstance = Cast<UAlsAnimationInstance>(OwnerCharacter->GetMesh()->GetAnimInstance());
+
+		Super::InitializeComponent();
+
+		// Use absolute mesh rotation to be able to synchronize character rotation with
+		// rotation animations by updating the mesh rotation only from the animation instance.
+
+		OwnerCharacter->GetMesh()->SetUsingAbsoluteRotation(true);
+	}
 	ALS_ENSURE(IsValid(Settings));
 	ALS_ENSURE(IsValid(MovementSettings));
 	ALS_ENSURE(AnimationInstance.IsValid());
@@ -155,12 +168,8 @@ void UAlsComponent::BeginPlay()
 	ALS_ENSURE_MESSAGE(!OwnerCharacter->bUseControllerRotationPitch && !OwnerCharacter->bUseControllerRotationYaw && !OwnerCharacter->bUseControllerRotationRoll,
 	                   TEXT("These settings are not allowed and must be turned off!"));
 
+	
 	Super::BeginPlay();
-
-	if (!OwnerCharacter)
-	{
-		OwnerCharacter = Cast<ACharacter>(GetOwner());
-	}
 
 	if (OwnerCharacter->bUseControllerRotationYaw)
 	{
@@ -322,7 +331,12 @@ void UAlsComponent::Restart()
 
 void UAlsComponent::RefreshVisibilityBasedAnimTickOption() const
 {
-	const auto DefaultTickOption{GetClass()->GetDefaultObject<ThisClass>()->OwnerCharacter->GetMesh()->VisibilityBasedAnimTickOption};
+	const auto* CharacterCDO = GetOwner()->GetClass()->GetDefaultObject<ACharacter>();
+	if (CharacterCDO == nullptr || CharacterCDO->GetMesh() == nullptr)
+	{
+		return;	
+	}
+	const EVisibilityBasedAnimTickOption DefaultTickOption{CharacterCDO->GetMesh()->VisibilityBasedAnimTickOption};
 
 	// Make sure that the pose is always ticked on the server when the character is controlled
 	// by a remote client, otherwise some problems may arise (such as jitter when rolling).
@@ -652,12 +666,11 @@ void UAlsComponent::ApplyDesiredStance()
 	}
 }
 
-bool UAlsComponent::CanCrouch() const
-{
-	// This allows to execute the ACharacter::Crouch() function properly when bIsCrouched is true.
-
-	return OwnerCharacter->bIsCrouched || OwnerCharacter->CanCrouch();
-}
+// bool UAlsComponent::CanCrouch() const
+// {
+// 	// This allows to execute the ACharacter::Crouch() function properly when bIsCrouched is true.
+// 	return OwnerCharacter->bIsCrouched;
+// }
 
 void UAlsComponent::OnStartCrouch(const float HalfHeightAdjust, const float ScaledHalfHeightAdjust)
 {
@@ -832,7 +845,10 @@ void UAlsComponent::OnReplicated_OverlayMode(const FGameplayTag& PreviousOverlay
 	OnOverlayModeChanged(PreviousOverlayMode);
 }
 
-void UAlsComponent::OnOverlayModeChanged_Implementation(const FGameplayTag& PreviousOverlayMode) {}
+void UAlsComponent::OnOverlayModeChanged_Implementation(const FGameplayTag& PreviousOverlayMode)
+{
+	OnOverlayModeChangedEvent.Broadcast(PreviousOverlayMode);
+}
 
 void UAlsComponent::SetLocomotionAction(const FGameplayTag& NewLocomotionAction)
 {
@@ -1092,16 +1108,13 @@ void UAlsComponent::RefreshLocomotion(const float DeltaTime)
 	                          LocomotionState.Speed > Settings->MovingSpeedThreshold;
 }
 
-void UAlsComponent::Jump()
+bool UAlsComponent::CanJump()
 {
-	if (Stance == AlsStanceTags::Standing && !LocomotionAction.IsValid() &&
-	    LocomotionMode == AlsLocomotionModeTags::Grounded)
-	{
-		OwnerCharacter->Jump();	
-	}
+	return Stance == AlsStanceTags::Standing && !LocomotionAction.IsValid() &&
+		LocomotionMode == AlsLocomotionModeTags::Grounded;
 }
 
-void UAlsComponent::OnJumped_Implementation()
+void UAlsComponent::OnJumped()
 {
 	if (OwnerCharacter->IsLocallyControlled())
 	{

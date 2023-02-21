@@ -14,7 +14,16 @@ class UAlsCharacterSettings;
 class UAlsMovementSettings;
 class UAlsAnimationInstance;
 
-UCLASS(AutoExpandCategories = ("Settings|Als Character", "Settings|Als Character|Desired State", "State|Als Character"))
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOverlayModeChangedSignature,const FGameplayTag&, PreviousOverlayMode);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMantlingStartedSignature,const FAlsMantlingParameters&, Parameters);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);
+
+
+
+UCLASS(ClassGroup="Als", BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent),
+	AutoExpandCategories = ("Settings|Als Character", "Settings|Als Character|Desired State", "State|Als Character"))
 class ALS_API UAlsComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -104,21 +113,41 @@ protected:
 public:
 	explicit UAlsComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-// #if WITH_EDITOR
-// 	virtual bool CanEditChange(const FProperty* Property) const override;
-// #endif
+	// #if WITH_EDITOR
+	// 	virtual bool CanEditChange(const FProperty* Property) const override;
+	// #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void OnRegister() override;
-	virtual void InitializeComponent() override;
+
+	UFUNCTION(BlueprintPure, Category = "Als Character")
+	static UAlsComponent* FindAlsComponent(const AActor* Actor);
+
+	UFUNCTION(BlueprintCallable, Category = "Als Character", meta=(DisplayName="Find AlsComponent", ExpandBoolAsExecs = "ReturnValue"))
+	static bool K2_FindAlsComponent(const AActor* Actor, UAlsComponent*& Instance);
+
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FOverlayModeChangedSignature OnOverlayModeChangedEvent;
+
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FMantlingStartedSignature OnMantlingStartedEvent;
+
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FSimpleSignature OnMantlingEndedEvent;
+
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FSimpleSignature OnRagdollingStartedEvent;
+	
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FSimpleSignature OnRagdollingEndedEvent;
+	
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
-	
 	//call from owner.
 	virtual void PostNetReceiveLocationAndRotation();
 
@@ -232,13 +261,15 @@ protected:
 	// Stance
 
 public:
-	// call from owner
-	virtual bool CanCrouch() const;
+	// call from ownerCharacter
+	// virtual bool CanCrouch() const;
 
-	// call from owner.
+	// call from ownerCharacter.
+	UFUNCTION(BlueprintCallable, Category="Als Character")
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
 
-	// call from owner.
+	// call from ownerCharacter.
+	UFUNCTION(BlueprintCallable, Category="Als Character")
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
 
 public:
@@ -359,11 +390,13 @@ private:
 	// Jumping
 
 public:
-	// override for owner
-	virtual void Jump();
+	// call from owner Character
+	UFUNCTION(BlueprintPure, Category="Als Character")
+	virtual bool CanJump();
 
-	UFUNCTION(BlueprintCallable, Category="Als Character || Call from Character")
-	virtual void OnJumped_Implementation();
+	// call from owner Character
+	UFUNCTION(BlueprintCallable, Category="Als Character")
+	virtual void OnJumped();
 
 private:
 	UFUNCTION(NetMulticast, Reliable)
@@ -374,7 +407,6 @@ private:
 	// Rotation
 
 public:
-	
 	void CharacterMovement_OnPhysicsRotation(float DeltaTime);
 
 private:
@@ -484,6 +516,7 @@ protected:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnMantlingStarted(const FAlsMantlingParameters& Parameters);
+	virtual void OnMantlingStarted_Implementation(const FAlsMantlingParameters& Parameters);
 
 private:
 	void RefreshMantling();
@@ -493,6 +526,7 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnMantlingEnded();
+	virtual void OnMantlingEnded_Implementation();
 
 	// Ragdolling
 
@@ -514,6 +548,7 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnRagdollingStarted();
+	virtual void OnRagdollingStarted_Implementation();
 
 public:
 	bool IsRagdollingAllowedToStop() const;
@@ -539,6 +574,8 @@ protected:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnRagdollingEnded();
+	virtual void OnRagdollingEnded_Implementation();
+
 
 private:
 	void SetRagdollTargetLocation(const FVector& NewTargetLocation);
@@ -569,6 +606,13 @@ private:
 	void DisplayDebugTraces(const UCanvas* Canvas, float Scale, float HorizontalLocation, float& VerticalLocation) const;
 
 	void DisplayDebugMantling(const UCanvas* Canvas, float Scale, float HorizontalLocation, float& VerticalLocation) const;
+
+
+#if WITH_EDITOR
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) override;
+#endif
+	
+	
 };
 
 inline bool UAlsComponent::IsSimulatedProxyTeleported() const
@@ -645,3 +689,4 @@ inline const FAlsLocomotionState& UAlsComponent::GetLocomotionState() const
 {
 	return LocomotionState;
 }
+

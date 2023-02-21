@@ -16,7 +16,7 @@
 #include "Utility/AlsGameplayTags.h"
 #include "AlsAnimationInstance.generated.h"
 
-class AAlsCharacter;
+class UAlsComponent;
 
 UCLASS()
 class ALS_API UAlsAnimationInstance : public UAnimInstance
@@ -28,7 +28,10 @@ protected:
 	TObjectPtr<UAlsAnimationInstanceSettings> Settings;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
-	TObjectPtr<AAlsCharacter> Character;
+	TObjectPtr<ACharacter> Character;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
+	TObjectPtr<UAlsComponent> AlsComponent;
 
 	// Used to indicate that the animation instance has not been updated for a long time
 	// and its current state may not be correct (such as foot location used in foot locking).
