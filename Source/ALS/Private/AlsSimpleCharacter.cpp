@@ -16,6 +16,11 @@ AAlsSimpleCharacter::AAlsSimpleCharacter(const FObjectInitializer& ObjectInitial
 	AlsComponent = CreateDefaultSubobject<UAlsComponent>(TEXT("AlsComponent"));
 }
 
+UAlsComponent* AAlsSimpleCharacter::GetAlsComponent_Implementation() const
+{
+	return AlsComponent;
+}
+
 // Called when the game starts or when spawned
 void AAlsSimpleCharacter::BeginPlay()
 {
@@ -24,7 +29,11 @@ void AAlsSimpleCharacter::BeginPlay()
 
 void AAlsSimpleCharacter::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay, float& YL, float& YPos)
 {
-	AlsComponent->DisplayDebug(Canvas, DebugDisplay, YL, YPos);
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->DisplayDebug(Canvas, DebugDisplay, YL, YPos);
+	}
+	Super::DisplayDebug(Canvas, DebugDisplay, YL, YPos);
 }
 
 bool AAlsSimpleCharacter::CanCrouch() const
@@ -35,44 +44,66 @@ bool AAlsSimpleCharacter::CanCrouch() const
 void AAlsSimpleCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
 	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
-	AlsComponent->OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	}
 }
 
 void AAlsSimpleCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
 	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
-	AlsComponent->OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	}
 }
 
 void AAlsSimpleCharacter::PostNetReceiveLocationAndRotation()
 {
-	AlsComponent->PostNetReceiveLocationAndRotation();
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->PostNetReceiveLocationAndRotation();
+	}
 	Super::PostNetReceiveLocationAndRotation();
 }
 
 void AAlsSimpleCharacter::OnRep_ReplicatedBasedMovement()
 {
-	AlsComponent->OnRep_ReplicatedBasedMovement();
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->OnRep_ReplicatedBasedMovement();
+	}
 	Super::OnRep_ReplicatedBasedMovement();
 }
 
 void AAlsSimpleCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
-	AlsComponent->PossessedBy(NewController);
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->PossessedBy(NewController);
+	}
 }
 
 void AAlsSimpleCharacter::Restart()
 {
 	Super::Restart();
-	AlsComponent->Restart();
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->Restart();
+	}
 }
 
 bool AAlsSimpleCharacter::CanJumpInternal_Implementation() const
 {
-	if (AlsComponent->CanJump())
+
+	if (UAlsComponent* Als = GetAlsComponent())
 	{
-		return true;
+		if (Als->CanJump())
+		{
+			return true;
+		}
 	}
 	return Super::CanJumpInternal_Implementation();
 }
@@ -80,17 +111,27 @@ bool AAlsSimpleCharacter::CanJumpInternal_Implementation() const
 void AAlsSimpleCharacter::OnJumped_Implementation()
 {
 	Super::OnJumped_Implementation();
-	AlsComponent->OnJumped();
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->OnJumped();
+	}
 }
 
 FRotator AAlsSimpleCharacter::GetViewRotation() const
 {
-	// return Super::GetViewRotation();
-	return AlsComponent->GetViewRotation();
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		return Als->GetViewRotation();
+	}
+	return Super::GetViewRotation();
 }
 
-// Called every frame
-void AAlsSimpleCharacter::Tick(float DeltaTime)
+void AAlsSimpleCharacter::FaceRotation(FRotator NewControlRotation, float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+	UAlsComponent* Als = GetAlsComponent();
+	if (Als == nullptr)
+	{
+		Super::FaceRotation(NewControlRotation, DeltaTime);
+	}
 }
+

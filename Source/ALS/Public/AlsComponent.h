@@ -45,20 +45,20 @@ protected:
 		ReplicatedUsing = "OnReplicated_DesiredAiming")
 	bool bDesiredAiming;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated, meta=(Categories="Als.RotationMode"))
 	FGameplayTag DesiredRotationMode{AlsRotationModeTags::LookingDirection};
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated, meta=(Categories="Als.Stance"))
 	FGameplayTag DesiredStance{AlsStanceTags::Standing};
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated, meta=(Categories="Als.Gait"))
 	FGameplayTag DesiredGait{AlsGaitTags::Running};
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated, meta=(Categories="Als.ViewMode"))
 	FGameplayTag ViewMode{AlsViewModeTags::ThirdPerson};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State",
-		ReplicatedUsing = "OnReplicated_OverlayMode")
+		ReplicatedUsing = "OnReplicated_OverlayMode", meta=(Categories="Als.OverlayMode"))
 	FGameplayTag OverlayMode{AlsOverlayModeTags::Default};
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
@@ -174,11 +174,13 @@ public:
 	const FGameplayTag& GetViewMode() const;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (AutoCreateRefTerm = "NewViewMode"))
-	void SetViewMode(const FGameplayTag& NewViewMode);
+	void SetViewMode(UPARAM(meta=(Categories="Als.ViewMode")) const FGameplayTag& NewViewMode);
 
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetViewMode(const FGameplayTag& NewViewMode);
+	virtual void ServerSetViewMode_Implementation(const FGameplayTag& NewViewMode);
+
 
 	// Locomotion Mode
 
@@ -197,6 +199,7 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
+	virtual void OnLocomotionModeChanged_Implementation(const FGameplayTag& PreviousLocomotionMode);
 
 	// Desired Aiming
 
@@ -209,6 +212,8 @@ public:
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetDesiredAiming(bool bNewDesiredAiming);
+	virtual void ServerSetDesiredAiming_Implementation(bool bNewDesiredAiming);
+
 
 	UFUNCTION()
 	void OnReplicated_DesiredAiming(bool bPreviousDesiredAiming);
@@ -216,6 +221,8 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnDesiredAimingChanged(bool bPreviousDesiredAiming);
+	virtual void OnDesiredAimingChanged_Implementation(bool bPreviousDesiredAiming);
+
 
 	// Desired Rotation Mode
 
@@ -223,11 +230,12 @@ public:
 	const FGameplayTag& GetDesiredRotationMode() const;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (AutoCreateRefTerm = "NewDesiredRotationMode"))
-	void SetDesiredRotationMode(const FGameplayTag& NewDesiredRotationMode);
+	void SetDesiredRotationMode(UPARAM(meta=(Categories="Als.RotationMode")) const FGameplayTag& NewDesiredRotationMode);
 
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetDesiredRotationMode(const FGameplayTag& NewDesiredRotationMode);
+	virtual void ServerSetDesiredRotationMode_Implementation(const FGameplayTag& NewDesiredRotationMode);
 
 	// Rotation Mode
 
@@ -240,6 +248,7 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnRotationModeChanged(const FGameplayTag& PreviousRotationMode);
+	virtual void OnRotationModeChanged_Implementation(const FGameplayTag& PreviousRotationMode);
 
 	void RefreshRotationMode();
 
@@ -249,11 +258,13 @@ public:
 	const FGameplayTag& GetDesiredStance() const;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (AutoCreateRefTerm = "NewDesiredStance"))
-	void SetDesiredStance(const FGameplayTag& NewDesiredStance);
+	void SetDesiredStance(UPARAM(meta=(Categories="Als.Stance")) const FGameplayTag& NewDesiredStance);
 
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetDesiredStance(const FGameplayTag& NewDesiredStance);
+	virtual void ServerSetDesiredStance_Implementation(const FGameplayTag& NewDesiredStance);
+
 
 protected:
 	virtual void ApplyDesiredStance();
@@ -265,11 +276,11 @@ public:
 	// virtual bool CanCrouch() const;
 
 	// call from ownerCharacter.
-	UFUNCTION(BlueprintCallable, Category="Als Character")
+	UFUNCTION(BlueprintCallable, Category = "Als Character")
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
 
 	// call from ownerCharacter.
-	UFUNCTION(BlueprintCallable, Category="Als Character")
+	UFUNCTION(BlueprintCallable, Category = "Als Character")
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
 
 public:
@@ -281,18 +292,20 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnStanceChanged(const FGameplayTag& PreviousStance);
-
+	virtual void OnStanceChanged_Implementation(const FGameplayTag& PreviousStance);
 	// Desired Gait
 
 public:
 	const FGameplayTag& GetDesiredGait() const;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (AutoCreateRefTerm = "NewDesiredGait"))
-	void SetDesiredGait(const FGameplayTag& NewDesiredGait);
+	void SetDesiredGait(UPARAM(meta=(Categories="Als.Gait")) const FGameplayTag& NewDesiredGait);
 
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetDesiredGait(const FGameplayTag& NewDesiredGait);
+	virtual void ServerSetDesiredGait_Implementation(const FGameplayTag& NewDesiredGait);
+
 
 	// Gait
 
@@ -305,6 +318,7 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnGaitChanged(const FGameplayTag& PreviousGait);
+	virtual void OnGaitChanged_Implementation(const FGameplayTag& PreviousGait);
 
 private:
 	void RefreshGait();
@@ -321,11 +335,13 @@ public:
 	const FGameplayTag& GetOverlayMode() const;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (AutoCreateRefTerm = "NewOverlayMode"))
-	void SetOverlayMode(const FGameplayTag& NewOverlayMode);
+	void SetOverlayMode(UPARAM(meta=(Categories="Als.OverlayMode")) const FGameplayTag& NewOverlayMode);
 
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetOverlayMode(const FGameplayTag& NewOverlayMode);
+	virtual void ServerSetOverlayMode_Implementation(const FGameplayTag& NewOverlayMode);
+
 
 	UFUNCTION()
 	void OnReplicated_OverlayMode(const FGameplayTag& PreviousOverlayMode);
@@ -333,6 +349,7 @@ private:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
+	virtual void OnOverlayModeChanged_Implementation(const FGameplayTag& PreviousOverlayMode);
 
 	// Locomotion Action
 
@@ -346,6 +363,7 @@ public:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
+	virtual void OnLocomotionActionChanged_Implementation(const FGameplayTag& PreviousLocomotionAction);
 
 	// View
 
@@ -358,6 +376,8 @@ private:
 
 	UFUNCTION(Server, Unreliable)
 	void ServerSetRawViewRotation(const FRotator& NewViewRotation);
+	virtual void ServerSetRawViewRotation_Implementation(const FRotator& NewViewRotation);
+
 
 	UFUNCTION()
 	void OnReplicated_RawViewRotation();
@@ -401,6 +421,7 @@ public:
 private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastOnJumpedNetworked();
+	virtual void MulticastOnJumpedNetworked_Implementation();
 
 	void OnJumpedNetworked();
 
@@ -458,9 +479,13 @@ public:
 private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastLockRotation(float TargetYawAngle);
+	virtual void MulticastLockRotation_Implementation(float TargetYawAngle);
+
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastUnLockRotation();
+	virtual void MulticastUnLockRotation_Implementation();
+
 
 	// Rolling
 
@@ -470,6 +495,7 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	UAnimMontage* SelectRollMontage();
+	virtual UAnimMontage* SelectRollMontage_Implementation();
 
 	bool IsRollingAllowedToStart(const UAnimMontage* Montage) const;
 
@@ -478,10 +504,13 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerStartRolling(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
+	virtual void ServerStartRolling_Implementation(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
+
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStartRolling(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
-
+	virtual void MulticastStartRolling_Implementation(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
+	
 	void StartRollingImplementation(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
 
 	void RefreshRolling(float DeltaTime);
@@ -493,6 +522,8 @@ private:
 public:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	bool IsMantlingAllowedToStart() const;
+	virtual bool IsMantlingAllowedToStart_Implementation() const;
+
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
 	bool TryStartMantlingGrounded();
@@ -504,15 +535,18 @@ private:
 
 	UFUNCTION(Server, Reliable)
 	void ServerStartMantling(const FAlsMantlingParameters& Parameters);
+	virtual void ServerStartMantling_Implementation(const FAlsMantlingParameters& Parameters);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStartMantling(const FAlsMantlingParameters& Parameters);
-
+	virtual void MulticastStartMantling_Implementation(const FAlsMantlingParameters& Parameters);
+	
 	void StartMantlingImplementation(const FAlsMantlingParameters& Parameters);
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	UAlsMantlingSettings* SelectMantlingSettings(EAlsMantlingType MantlingType);
+	virtual UAlsMantlingSettings* SelectMantlingSettings_Implementation(EAlsMantlingType MantlingType);
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnMantlingStarted(const FAlsMantlingParameters& Parameters);
@@ -539,9 +573,12 @@ public:
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerStartRagdolling();
+	virtual void ServerStartRagdolling_Implementation();
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStartRagdolling();
+	virtual void MulticastStartRagdolling_Implementation();
+
 
 	void StartRagdollingImplementation();
 
@@ -559,9 +596,11 @@ public:
 private:
 	UFUNCTION(Server, Reliable)
 	void ServerStopRagdolling();
+	virtual void ServerStopRagdolling_Implementation();
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStopRagdolling();
+	virtual void MulticastStopRagdolling_Implementation();
 
 	void StopRagdollingImplementation();
 
@@ -571,6 +610,8 @@ public:
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	UAnimMontage* SelectGetUpMontage(bool bRagdollFacedUpward);
+	virtual UAnimMontage* SelectGetUpMontage_Implementation(bool bRagdollFacedUpward);
+
 
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnRagdollingEnded();
@@ -582,6 +623,8 @@ private:
 
 	UFUNCTION(Server, Unreliable)
 	void ServerSetRagdollTargetLocation(const FVector_NetQuantize100& NewTargetLocation);
+	virtual void ServerSetRagdollTargetLocation_Implementation(const FVector_NetQuantize100& NewTargetLocation);
+
 
 	void RefreshRagdolling(float DeltaTime);
 
@@ -590,7 +633,7 @@ private:
 	// Debug
 
 public:
-	// override for owner
+	// call from owner
 	virtual void DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& Unused, float& VerticalLocation);
 
 private:
@@ -610,6 +653,7 @@ private:
 
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) override;
+	virtual EDataValidationResult IsDataValid(TArray<FText>& ValidationErrors) override;
 #endif
 	
 	

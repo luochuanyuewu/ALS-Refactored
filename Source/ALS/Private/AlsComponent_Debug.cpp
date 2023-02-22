@@ -36,7 +36,6 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 	{
 		VerticalLocation = MaxVerticalLocation;
 
-		OwnerCharacter->DisplayDebug(Canvas, DisplayInfo, Unused, VerticalLocation);
 		return;
 	}
 
@@ -123,8 +122,6 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 	MaxVerticalLocation = FMath::Max(MaxVerticalLocation, VerticalLocation);
 
 	VerticalLocation = MaxVerticalLocation;
-
-	OwnerCharacter->DisplayDebug(Canvas, DisplayInfo, Unused, VerticalLocation);
 }
 
 void UAlsComponent::DisplayDebugHeader(const UCanvas* Canvas, const FText& HeaderText, const FLinearColor& HeaderColor,
@@ -596,6 +593,37 @@ EDataValidationResult UAlsComponent::IsDataValid(FDataValidationContext& Context
 	}
 	
 	return Super::IsDataValid(Context);
+}
+
+EDataValidationResult UAlsComponent::IsDataValid(TArray<FText>& ValidationErrors)
+{
+	const ACharacter* Character = Cast<ACharacter>(GetOwner());
+	if (Character == nullptr)
+	{
+		ValidationErrors.Add(FText::FromString(TEXT("Als component intend to be used with Character.")));
+		return EDataValidationResult::Invalid;
+	}
+
+	const UAlsCharacterMovementComponent* MovementComponent = Cast<UAlsCharacterMovementComponent>(Character->GetMovementComponent());
+	if (MovementComponent == nullptr)
+	{
+		ValidationErrors.Add(FText::FromString(TEXT("Als component intend to be paired with AlsCharacterMovementComponent.")));
+		return EDataValidationResult::Invalid;
+	}
+
+	if (Settings == nullptr)
+	{
+		ValidationErrors.Add(FText::FromString(TEXT("Settings are required.")));
+		return EDataValidationResult::Invalid;
+	}
+
+	if (MovementSettings == nullptr)
+	{
+		ValidationErrors.Add(FText::FromString(TEXT("MovementSettings are required.")));
+		return EDataValidationResult::Invalid;
+	}
+	
+	return Super::IsDataValid(ValidationErrors);
 }
 #endif
 

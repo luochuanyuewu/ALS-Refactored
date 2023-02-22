@@ -27,8 +27,8 @@ UAlsComponent::UAlsComponent(const FObjectInitializer& ObjectInitializer) : Supe
 
 	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
 	{
-		// bUseControllerRotationYaw = false;
-		// bClientCheckEncroachmentOnNetUpdate = true; // Required for bSimGravityDisabled to be updated.
+		Character->bUseControllerRotationYaw = false;
+		Character->bClientCheckEncroachmentOnNetUpdate = true; // Required for bSimGravityDisabled to be updated.
 		Character->GetCapsuleComponent()->InitCapsuleSize(30.0f, 90.0f);
 
 		Character->GetMesh()->SetRelativeLocation_Direct({0.0f, 0.0f, -92.0f});
@@ -97,7 +97,7 @@ void UAlsComponent::OnRegister()
 		Stance = DesiredStance;
 		Gait = DesiredGait;
 
-		SetRawViewRotation(OwnerCharacter->GetViewRotation().GetNormalized());
+		SetRawViewRotation(OwnerCharacter->GetControlRotation().GetNormalized());
 
 		ViewState.NetworkSmoothing.InitialRotation = RawViewRotation;
 		ViewState.NetworkSmoothing.Rotation = RawViewRotation;
@@ -153,8 +153,6 @@ void UAlsComponent::BeginPlay()
 		AlsCharacterMovement->SetMovementSettings(MovementSettings);
 
 		AnimationInstance = Cast<UAlsAnimationInstance>(OwnerCharacter->GetMesh()->GetAnimInstance());
-
-		Super::InitializeComponent();
 
 		// Use absolute mesh rotation to be able to synchronize character rotation with
 		// rotation animations by updating the mesh rotation only from the animation instance.
@@ -660,10 +658,10 @@ void UAlsComponent::ApplyDesiredStance()
 			OwnerCharacter->UnCrouch();
 		}
 	}
-	else if (LocomotionAction == AlsLocomotionActionTags::Rolling && Settings->Rolling.bCrouchOnStart)
-	{
-		OwnerCharacter->Crouch();
-	}
+	// else if (LocomotionAction == AlsLocomotionActionTags::Rolling && Settings->Rolling.bCrouchOnStart)
+	// {
+	// 	OwnerCharacter->Crouch();
+	// }
 }
 
 // bool UAlsComponent::CanCrouch() const
@@ -971,7 +969,7 @@ void UAlsComponent::RefreshView(const float DeltaTime)
 	// ReSharper disable once CppRedundantParentheses
 	if ((OwnerCharacter->IsReplicatingMovement() && OwnerCharacter->GetLocalRole() >= ROLE_AutonomousProxy) || OwnerCharacter->IsLocallyControlled())
 	{
-		SetRawViewRotation(OwnerCharacter->GetViewRotation().GetNormalized());
+		SetRawViewRotation(OwnerCharacter->GetControlRotation().GetNormalized());
 	}
 
 	RefreshViewNetworkSmoothing(DeltaTime);

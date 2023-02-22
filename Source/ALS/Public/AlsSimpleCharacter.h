@@ -14,11 +14,11 @@ class ALS_API AAlsSimpleCharacter : public ACharacter
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this character's properties
 	AAlsSimpleCharacter(const FObjectInitializer& ObjectInitializer);
 
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	UFUNCTION(BlueprintPure, BlueprintNativeEvent, Category = "Als Character")
+	UAlsComponent* GetAlsComponent() const;
+	virtual UAlsComponent* GetAlsComponent_Implementation() const;
 	
 protected:
 	// Called when the game starts or when spawned
@@ -35,6 +35,7 @@ protected:
 	virtual bool CanJumpInternal_Implementation() const override;
 	virtual void OnJumped_Implementation() override;
 	virtual FRotator GetViewRotation() const override;
+	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime) override final;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Als Character")
 	TObjectPtr<UAlsComponent> AlsComponent;
