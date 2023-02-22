@@ -27,7 +27,7 @@ void UAlsAnimNotifyState_EarlyBlendOut::NotifyTick(USkeletalMeshComponent* Mesh,
 	const auto* Montage{Cast<UAnimMontage>(Animation)};
 	auto* AnimationInstance{IsValid(Montage) ? Mesh->GetAnimInstance() : nullptr};
 	// const auto* Character{IsValid(AnimationInstance) ? Cast<AAlsCharacter>(Mesh->GetOwner()) : nullptr};
-	const UAlsComponent* AlsComponent{IsValid(AnimationInstance) ? Cast<UAlsComponent>(Mesh->GetOwner()) : nullptr};
+	const UAlsComponent* AlsComponent{IsValid(AnimationInstance) ?UAlsComponent::FindAlsComponent(Mesh->GetOwner()) : nullptr};
 
 
 	// ReSharper disable CppRedundantParentheses

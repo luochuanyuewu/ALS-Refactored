@@ -23,7 +23,7 @@ void UAlsAnimNotifyState_SetLocomotionAction::NotifyBegin(USkeletalMeshComponent
 {
 	Super::NotifyBegin(Mesh, Animation, Duration, EventReference);
 
-	UAlsComponent* AlsComponent{Cast<UAlsComponent>(Mesh->GetOwner())};
+	UAlsComponent* AlsComponent{UAlsComponent::FindAlsComponent(Mesh->GetOwner())};
 
 	if (IsValid(AlsComponent))
 	{
@@ -36,7 +36,7 @@ void UAlsAnimNotifyState_SetLocomotionAction::NotifyEnd(USkeletalMeshComponent* 
 {
 	Super::NotifyEnd(Mesh, Animation, EventReference);
 
-	UAlsComponent* AlsComponent{Cast<UAlsComponent>(Mesh->GetOwner())};
+	UAlsComponent* AlsComponent{UAlsComponent::FindAlsComponent(Mesh->GetOwner())};
 
 	if (IsValid(AlsComponent) && AlsComponent->GetLocomotionAction() == LocomotionAction)
 	{

@@ -658,10 +658,10 @@ void UAlsComponent::ApplyDesiredStance()
 			OwnerCharacter->UnCrouch();
 		}
 	}
-	// else if (LocomotionAction == AlsLocomotionActionTags::Rolling && Settings->Rolling.bCrouchOnStart)
-	// {
-	// 	OwnerCharacter->Crouch();
-	// }
+	else if (LocomotionAction == AlsLocomotionActionTags::Rolling && Settings->Rolling.bCrouchOnStart)
+	{
+		OwnerCharacter->Crouch();
+	}
 }
 
 // bool UAlsComponent::CanCrouch() const
