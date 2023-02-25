@@ -3,10 +3,30 @@
 #include "DisplayDebugHelpers.h"
 #include "Animation/AnimInstance.h"
 #include "Engine/Canvas.h"
+#include "GameFramework/HUD.h"
 #include "Utility/AlsCameraConstants.h"
 #include "Utility/AlsUtility.h"
 
 #define LOCTEXT_NAMESPACE "AlsCameraComponentDebug"
+
+void UAlsCameraComponent::OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)
+{
+	if (!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraCurvesDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraShapesDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraTracesDisplayName()))
+	{
+		return;
+	}
+	if (HUD->GetCurrentDebugTargetActor())
+	{
+		UAlsCameraComponent* AlsCamera = UAlsCameraComponent::FindAlsCameraComponent(HUD->GetCurrentDebugTargetActor())();
+
+		if (AlsCamera)
+		{
+			AlsCamera->DisplayDebug(Canvas, DisplayInfo, YPos);
+		}
+	}
+}
 
 void UAlsCameraComponent::DisplayDebug(const UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& VerticalLocation) const
 {
@@ -19,8 +39,8 @@ void UAlsCameraComponent::DisplayDebug(const UCanvas* Canvas, const FDebugDispla
 	auto HorizontalLocation{5.0f * Scale};
 
 	if (!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraCurvesDisplayName()) &&
-	    !DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraShapesDisplayName()) &&
-	    !DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraTracesDisplayName()))
+		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraShapesDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraTracesDisplayName()))
 	{
 		VerticalLocation = MaxVerticalLocation;
 		return;

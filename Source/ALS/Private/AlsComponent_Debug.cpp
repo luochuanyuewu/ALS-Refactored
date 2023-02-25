@@ -6,12 +6,33 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/Canvas.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/HUD.h"
 #include "Misc/DataValidation.h"
 #include "Utility/AlsConstants.h"
 #include "Utility/AlsMath.h"
 #include "Utility/AlsUtility.h"
 
 #define LOCTEXT_NAMESPACE "AlsComponentDebug"
+
+void UAlsComponent::OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)
+{
+	if (!DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::StateDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDisplayName()))
+	{
+		return;
+	}
+
+	if (HUD->GetCurrentDebugTargetActor())
+	{
+		UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(HUD->GetCurrentDebugTargetActor())();
+
+		if (AlsComponent)
+		{
+			AlsComponent->DisplayDebug(Canvas, DisplayInfo, YL, YPos);
+		}
+	}
+}
 
 void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& Unused, float& VerticalLocation)
 {
@@ -31,8 +52,8 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 	MaxVerticalLocation = FMath::Max(MaxVerticalLocation, VerticalLocation);
 
 	if (!DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::StateDisplayName()) &&
-	    !DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDisplayName()) &&
-	    !DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDisplayName()))
+		!DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDisplayName()))
 	{
 		VerticalLocation = MaxVerticalLocation;
 
@@ -590,7 +611,7 @@ EDataValidationResult UAlsComponent::IsDataValid(TArray<FText>& ValidationErrors
 		ValidationErrors.Add(FText::FromString(TEXT("MovementSettings are required.")));
 		return EDataValidationResult::Invalid;
 	}
-	
+
 	return Super::IsDataValid(ValidationErrors);
 }
 #endif
