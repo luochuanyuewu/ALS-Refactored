@@ -28,11 +28,11 @@ void AAlsSimpleCharacter::BeginPlay()
 
 bool AAlsSimpleCharacter::CanCrouch() const
 {
-	// This allows to execute the ACharacter::Crouch() function properly when bIsCrouched is true.
-	// if (UAlsComponent* Als = GetAlsComponent())
-	// {
-	// 	return bIsCrouched || Super::CanCrouch();
-	// }
+	 //This allows to execute the ACharacter::Crouch() function properly when bIsCrouched is true.
+	 if (UAlsComponent* Als = GetAlsComponent())
+	 {
+	 	return bIsCrouched || Super::CanCrouch();
+	 }
 	return Super::CanCrouch();
 }
 

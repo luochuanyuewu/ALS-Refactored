@@ -19,7 +19,7 @@ void UAlsCameraComponent::OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDeb
 	}
 	if (HUD->GetCurrentDebugTargetActor())
 	{
-		UAlsCameraComponent* AlsCamera = UAlsCameraComponent::FindAlsCameraComponent(HUD->GetCurrentDebugTargetActor())();
+		UAlsCameraComponent* AlsCamera = UAlsCameraComponent::FindAlsCameraComponent(HUD->GetCurrentDebugTargetActor());
 
 		if (AlsCamera)
 		{

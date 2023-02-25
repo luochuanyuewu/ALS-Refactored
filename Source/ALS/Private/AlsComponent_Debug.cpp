@@ -25,7 +25,7 @@ void UAlsComponent::OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDebugDisp
 
 	if (HUD->GetCurrentDebugTargetActor())
 	{
-		UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(HUD->GetCurrentDebugTargetActor())();
+		UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(HUD->GetCurrentDebugTargetActor());
 
 		if (AlsComponent)
 		{

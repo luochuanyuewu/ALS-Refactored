@@ -20,8 +20,6 @@ public:
 	// Sets default values for this component's properties
 	UAlsControlComponent();
 
-	virtual void BindActions();
-
 	virtual void BeginPlay() override;
 
 protected:
