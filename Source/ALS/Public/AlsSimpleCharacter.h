@@ -23,8 +23,7 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	virtual void DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay, float& YL, float& YPos) override;
-
+	
 	virtual bool CanCrouch() const override;
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
@@ -36,10 +35,4 @@ protected:
 	virtual void OnJumped_Implementation() override;
 	virtual FRotator GetViewRotation() const override;
 	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime) override final;
-
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Als Character")
-	TObjectPtr<UAlsComponent> AlsComponent;
-
-
-
 };

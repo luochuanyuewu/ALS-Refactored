@@ -652,7 +652,6 @@ private:
 
 
 #if WITH_EDITOR
-	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) override;
 	virtual EDataValidationResult IsDataValid(TArray<FText>& ValidationErrors) override;
 #endif
 	

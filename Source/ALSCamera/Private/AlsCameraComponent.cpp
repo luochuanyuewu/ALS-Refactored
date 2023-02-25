@@ -19,6 +19,11 @@ UAlsCameraComponent::UAlsCameraComponent()
 	bHiddenInGame = true;
 }
 
+UAlsCameraComponent* UAlsCameraComponent::FindAlsCameraComponent(const AActor* Actor)
+{
+	return Actor != nullptr ? Actor->FindComponentByClass<UAlsCameraComponent>() : nullptr;
+}
+
 void UAlsCameraComponent::OnRegister()
 {
 	Character = Cast<ACharacter>(GetOwner());

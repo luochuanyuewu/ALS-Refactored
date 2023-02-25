@@ -12,13 +12,11 @@ AAlsSimpleCharacter::AAlsSimpleCharacter(const FObjectInitializer& ObjectInitial
 {
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
-	AlsComponent = CreateDefaultSubobject<UAlsComponent>(TEXT("AlsComponent"));
 }
 
 UAlsComponent* AAlsSimpleCharacter::GetAlsComponent_Implementation() const
 {
-	return AlsComponent;
+	return nullptr;
 }
 
 // Called when the game starts or when spawned
@@ -27,14 +25,6 @@ void AAlsSimpleCharacter::BeginPlay()
 	Super::BeginPlay();
 }
 
-void AAlsSimpleCharacter::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay, float& YL, float& YPos)
-{
-	if (UAlsComponent* Als = GetAlsComponent())
-	{
-		Als->DisplayDebug(Canvas, DebugDisplay, YL, YPos);
-	}
-	Super::DisplayDebug(Canvas, DebugDisplay, YL, YPos);
-}
 
 bool AAlsSimpleCharacter::CanCrouch() const
 {

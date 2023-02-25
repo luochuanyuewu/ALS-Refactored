@@ -576,41 +576,9 @@ void UAlsComponent::DisplayDebugMantling(const UCanvas* Canvas, const float Scal
 }
 
 #if WITH_EDITOR
-EDataValidationResult UAlsComponent::IsDataValid(FDataValidationContext& Context)
-{
-	const ACharacter* Character = Cast<ACharacter>(GetOwner());
-	if (Character == nullptr)
-	{
-		Context.AddError(FText::FromString(TEXT("Als component intend to be used with Character.")));
-		return EDataValidationResult::Invalid;
-	}
-
-	const UAlsCharacterMovementComponent* MovementComponent = Cast<UAlsCharacterMovementComponent>(Character->GetMovementComponent());
-	if (MovementComponent == nullptr)
-	{
-		Context.AddError(FText::FromString(TEXT("Als component intend to be paired with AlsCharacterMovementComponent.")));
-		return EDataValidationResult::Invalid;
-	}
-	
-	return Super::IsDataValid(Context);
-}
 
 EDataValidationResult UAlsComponent::IsDataValid(TArray<FText>& ValidationErrors)
 {
-	const ACharacter* Character = Cast<ACharacter>(GetOwner());
-	if (Character == nullptr)
-	{
-		ValidationErrors.Add(FText::FromString(TEXT("Als component intend to be used with Character.")));
-		return EDataValidationResult::Invalid;
-	}
-
-	const UAlsCharacterMovementComponent* MovementComponent = Cast<UAlsCharacterMovementComponent>(Character->GetMovementComponent());
-	if (MovementComponent == nullptr)
-	{
-		ValidationErrors.Add(FText::FromString(TEXT("Als component intend to be paired with AlsCharacterMovementComponent.")));
-		return EDataValidationResult::Invalid;
-	}
-
 	if (Settings == nullptr)
 	{
 		ValidationErrors.Add(FText::FromString(TEXT("Settings are required.")));

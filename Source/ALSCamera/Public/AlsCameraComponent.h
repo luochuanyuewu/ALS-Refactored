@@ -57,6 +57,9 @@ protected:
 public:
 	UAlsCameraComponent();
 
+	UFUNCTION(BlueprintPure, Category = "ALS| Als Camera")
+	static UAlsCameraComponent* FindAlsCameraComponent(const AActor* Actor);
+
 	virtual void OnRegister() override;
 
 	virtual void Activate(bool bReset) override;
