@@ -19,6 +19,16 @@ public:
 	UFUNCTION(BlueprintPure, BlueprintNativeEvent, Category = "Als Character")
 	UAlsComponent* GetAlsComponent() const;
 	virtual UAlsComponent* GetAlsComponent_Implementation() const;
+
+
+#if WITH_EDITOR
+	virtual bool CanEditChange(const FProperty* Property) const override;
+#endif
+
+
+	virtual void PreRegisterAllComponents() override;
+
+	virtual void PostInitializeComponents() override;
 	
 protected:
 	// Called when the game starts or when spawned

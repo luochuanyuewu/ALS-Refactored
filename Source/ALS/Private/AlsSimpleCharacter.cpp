@@ -4,15 +4,59 @@
 #include "AlsSimpleCharacter.h"
 
 #include "AlsComponent.h"
+#include "Components/CapsuleComponent.h"
 
 
 // Sets default values
 AAlsSimpleCharacter::AAlsSimpleCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+
+	bUseControllerRotationYaw = false;
+	bClientCheckEncroachmentOnNetUpdate = true; // Required for bSimGravityDisabled to be updated.
+
+	GetCapsuleComponent()->InitCapsuleSize(30.0f, 90.0f);
+
+	GetMesh()->SetRelativeLocation_Direct({0.0f, 0.0f, -92.0f});
+	GetMesh()->SetRelativeRotation_Direct({0.0f, -90.0f, 0.0f});
+
+	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+
+	GetMesh()->bEnableUpdateRateOptimizations = false;
+
+	GetMesh()->bUpdateJointsFromAnimation = true; // Required for the flail animation to work properly when ragdolling.
+
+	// This will prevent the editor from combining component details with actor details.
+	// Component details can still be accessed from the actor's component hierarchy.
+
+	#if WITH_EDITOR
+	StaticClass()->FindPropertyByName(TEXT("Mesh"))->SetPropertyFlags(CPF_DisableEditOnInstance);
+	StaticClass()->FindPropertyByName(TEXT("CapsuleComponent"))->SetPropertyFlags(CPF_DisableEditOnInstance);
+	StaticClass()->FindPropertyByName(TEXT("CharacterMovement"))->SetPropertyFlags(CPF_DisableEditOnInstance);
+#endif
 }
+
+#if WITH_EDITOR
+bool AAlsSimpleCharacter::CanEditChange(const FProperty* Property) const
+{
+	return Super::CanEditChange(Property) &&
+		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationPitch) &&
+		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationYaw) &&
+		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationRoll);
+}
+
+void AAlsSimpleCharacter::PreRegisterAllComponents()
+{
+	Super::PreRegisterAllComponents();
+}
+
+void AAlsSimpleCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+}
+#endif
+
 
 UAlsComponent* AAlsSimpleCharacter::GetAlsComponent_Implementation() const
 {

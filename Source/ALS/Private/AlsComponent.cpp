@@ -25,44 +25,7 @@ UAlsComponent::UAlsComponent(const FObjectInitializer& ObjectInitializer) : Supe
 	SetIsReplicatedByDefault(true);
 	PrimaryComponentTick.bCanEverTick = true;
 
-	if (ACharacter* Character = Cast<ACharacter>(GetOwner()))
-	{
-		Character->bUseControllerRotationYaw = false;
-		Character->bClientCheckEncroachmentOnNetUpdate = true; // Required for bSimGravityDisabled to be updated.
-		Character->GetCapsuleComponent()->InitCapsuleSize(30.0f, 90.0f);
-
-		Character->GetMesh()->SetRelativeLocation_Direct({0.0f, 0.0f, -92.0f});
-		Character->GetMesh()->SetRelativeRotation_Direct({0.0f, -90.0f, 0.0f});
-
-		Character->GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
-
-		Character->GetMesh()->bEnableUpdateRateOptimizations = false;
-
-		Character->GetMesh()->bUpdateJointsFromAnimation = true; // Required for the flail animation to work properly when ragdolling.
-	}
-
-
-	// AlsCharacterMovement = Cast<UAlsCharacterMovementComponent>(GetCharacterMovement());
-
-	// This will prevent the editor from combining component details with actor details.
-	// Component details can still be accessed from the actor's component hierarchy.
-
-	// #if WITH_EDITOR
-	// 	StaticClass()->FindPropertyByName(TEXT("Mesh"))->SetPropertyFlags(CPF_DisableEditOnInstance);
-	// 	StaticClass()->FindPropertyByName(TEXT("CapsuleComponent"))->SetPropertyFlags(CPF_DisableEditOnInstance);
-	// 	StaticClass()->FindPropertyByName(TEXT("CharacterMovement"))->SetPropertyFlags(CPF_DisableEditOnInstance);
-	// #endif
 }
-
-// #if WITH_EDITOR
-// bool UAlsComponent::CanEditChange(const FProperty* Property) const
-// {
-// 	return Super::CanEditChange(Property) &&
-// 	       Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationPitch) &&
-// 	       Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationYaw) &&
-// 	       Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationRoll);
-// }
-// #endif
 
 void UAlsComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
