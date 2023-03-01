@@ -45,6 +45,7 @@ bool AAlsSimpleCharacter::CanEditChange(const FProperty* Property) const
 		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationYaw) &&
 		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationRoll);
 }
+#endif
 
 void AAlsSimpleCharacter::PreRegisterAllComponents()
 {
@@ -55,8 +56,6 @@ void AAlsSimpleCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 }
-#endif
-
 
 UAlsComponent* AAlsSimpleCharacter::GetAlsComponent_Implementation() const
 {
