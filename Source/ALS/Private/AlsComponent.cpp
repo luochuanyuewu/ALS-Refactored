@@ -333,6 +333,18 @@ void UAlsComponent::ServerSetViewMode_Implementation(const FGameplayTag& NewView
 	SetViewMode(NewViewMode);
 }
 
+void UAlsComponent::SetLocomotionMode(const FGameplayTag& NewLocomotionMode)
+{
+	if (LocomotionMode != NewLocomotionMode)
+	{
+		const auto PreviousLocomotionMode{LocomotionMode};
+
+		LocomotionMode = NewLocomotionMode;
+
+		NotifyLocomotionModeChanged(PreviousLocomotionMode);
+	}
+}
+
 void UAlsComponent::OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	// Use the character movement mode to set the locomotion mode to the right value. This allows you to have a
@@ -350,20 +362,8 @@ void UAlsComponent::OnMovementModeChanged(ACharacter* InCharacter, EMovementMode
 		break;
 
 	default:
-		SetLocomotionMode(FGameplayTag::EmptyTag);
+		// SetLocomotionMode(FGameplayTag::EmptyTag);
 		break;
-	}
-}
-
-void UAlsComponent::SetLocomotionMode(const FGameplayTag& NewLocomotionMode)
-{
-	if (LocomotionMode != NewLocomotionMode)
-	{
-		const auto PreviousLocomotionMode{LocomotionMode};
-
-		LocomotionMode = NewLocomotionMode;
-
-		NotifyLocomotionModeChanged(PreviousLocomotionMode);
 	}
 }
 
@@ -423,8 +423,10 @@ void UAlsComponent::NotifyLocomotionModeChanged(const FGameplayTag& PreviousLoco
 	OnLocomotionModeChanged(PreviousLocomotionMode);
 }
 
-void UAlsComponent::OnLocomotionModeChanged_Implementation(const FGameplayTag& PreviousLocomotionMode)
+void UAlsComponent::OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode)
 {
+	BpOnLocomotionModeChanged(PreviousLocomotionMode);
+	OnLocomotionModeChangedEvent.Broadcast(PreviousLocomotionMode);
 }
 
 void UAlsComponent::SetDesiredAiming(const bool bNewDesiredAiming)
@@ -699,8 +701,9 @@ void UAlsComponent::SetGait(const FGameplayTag& NewGait)
 	}
 }
 
-void UAlsComponent::OnGaitChanged_Implementation(const FGameplayTag& PreviousGait)
+void UAlsComponent::OnGaitChanged(const FGameplayTag& PreviousGait)
 {
+	BpOnGaitChanged(PreviousGait);
 }
 
 void UAlsComponent::RefreshGait()
@@ -816,8 +819,9 @@ void UAlsComponent::OnReplicated_OverlayMode(const FGameplayTag& PreviousOverlay
 	OnOverlayModeChanged(PreviousOverlayMode);
 }
 
-void UAlsComponent::OnOverlayModeChanged_Implementation(const FGameplayTag& PreviousOverlayMode)
+void UAlsComponent::OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode)
 {
+	BpOnOverlayModeChanged(PreviousOverlayMode);
 	OnOverlayModeChangedEvent.Broadcast(PreviousOverlayMode);
 }
 
@@ -840,8 +844,10 @@ void UAlsComponent::NotifyLocomotionActionChanged(const FGameplayTag& PreviousLo
 	OnLocomotionActionChanged(PreviousLocomotionAction);
 }
 
-void UAlsComponent::OnLocomotionActionChanged_Implementation(const FGameplayTag& PreviousLocomotionAction)
+void UAlsComponent::OnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction)
 {
+	BpOnLocomotionActionChanged(PreviousLocomotionAction);
+	OnLocomotionActionChangedEvent.Broadcast(PreviousLocomotionAction);
 }
 
 FRotator UAlsComponent::GetViewRotation() const

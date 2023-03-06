@@ -16,6 +16,10 @@ class UAlsAnimationInstance;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOverlayModeChangedSignature,const FGameplayTag&, PreviousOverlayMode);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLocomotionModeChangedSignature,const FGameplayTag&, PreviousLocomotionMode);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLocomotionActionChangedSignature,const FGameplayTag&, PreviousLocomotionAction);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMantlingStartedSignature,const FAlsMantlingParameters&, Parameters);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);
@@ -131,6 +135,12 @@ public:
 	FOverlayModeChangedSignature OnOverlayModeChangedEvent;
 
 	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FLocomotionModeChangedSignature OnLocomotionModeChangedEvent;
+
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
+	FLocomotionActionChangedSignature OnLocomotionActionChangedEvent;
+
+	UPROPERTY(BlueprintAssignable, Category="Als Event")
 	FMantlingStartedSignature OnMantlingStartedEvent;
 
 	UPROPERTY(BlueprintAssignable, Category="Als Event")
@@ -183,23 +193,21 @@ private:
 
 
 	// Locomotion Mode
-
-public:
-	UFUNCTION()
-	virtual void OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode = 0);
-
 public:
 	const FGameplayTag& GetLocomotionMode() const;
 
-private:
 	void SetLocomotionMode(const FGameplayTag& NewLocomotionMode);
 
+private:
+	UFUNCTION()
+	virtual void OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode = 0);
 	void NotifyLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
 
 protected:
-	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
-	void OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
-	virtual void OnLocomotionModeChanged_Implementation(const FGameplayTag& PreviousLocomotionMode);
+
+	virtual void OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DisplayName = "On LocomotionMode Changed"))
+	void BpOnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
 
 	// Desired Aiming
 
@@ -316,9 +324,9 @@ private:
 	void SetGait(const FGameplayTag& NewGait);
 
 protected:
-	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
-	void OnGaitChanged(const FGameplayTag& PreviousGait);
-	virtual void OnGaitChanged_Implementation(const FGameplayTag& PreviousGait);
+	virtual void OnGaitChanged(const FGameplayTag& PreviousGait);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DisplayName = "On Gait Changed"))
+	void BpOnGaitChanged(const FGameplayTag& PreviousGait);
 
 private:
 	void RefreshGait();
@@ -347,9 +355,11 @@ private:
 	void OnReplicated_OverlayMode(const FGameplayTag& PreviousOverlayMode);
 
 protected:
-	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
-	void OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
-	virtual void OnOverlayModeChanged_Implementation(const FGameplayTag& PreviousOverlayMode);
+	
+	virtual void OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
+	
+	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DispplayName = "On OverlayMode Changed"))
+	void BpOnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
 
 	// Locomotion Action
 
@@ -361,9 +371,9 @@ public:
 	void NotifyLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
 
 protected:
-	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
-	virtual void OnLocomotionActionChanged_Implementation(const FGameplayTag& PreviousLocomotionAction);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DisplayName = "On LocomotionAction Changed"))
+	void BpOnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
 
 	// View
 
