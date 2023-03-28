@@ -6,8 +6,6 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsCameraAnimationInstance)
 
-#include UE_INLINE_GENERATED_CPP_BY_NAME(AlsCameraAnimationInstance)
-
 void UAlsCameraAnimationInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();

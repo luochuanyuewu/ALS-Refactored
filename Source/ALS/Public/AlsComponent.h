@@ -3,6 +3,7 @@
 #include "GameFramework/Character.h"
 #include "Settings/AlsMantlingSettings.h"
 #include "State/AlsLocomotionState.h"
+#include "State/AlsMovementBaseState.h"
 #include "State/AlsRagdollingState.h"
 #include "State/AlsRollingState.h"
 #include "State/AlsViewState.h"
@@ -50,7 +51,7 @@ protected:
 	bool bDesiredAiming;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated, meta=(Categories="Als.RotationMode"))
-	FGameplayTag DesiredRotationMode{AlsRotationModeTags::LookingDirection};
+	FGameplayTag DesiredRotationMode{AlsRotationModeTags::ViewDirection};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Character|Desired State", Replicated, meta=(Categories="Als.Stance"))
 	FGameplayTag DesiredStance{AlsStanceTags::Standing};
@@ -65,9 +66,6 @@ protected:
 		ReplicatedUsing = "OnReplicated_OverlayMode", meta=(Categories="Als.OverlayMode"))
 	FGameplayTag OverlayMode{AlsOverlayModeTags::Default};
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
-	bool bSimulatedProxyTeleported;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient, Meta = (ShowInnerProperties))
 	TWeakObjectPtr<UAlsAnimationInstance> AnimationInstance;
 
@@ -75,7 +73,7 @@ protected:
 	FGameplayTag LocomotionMode{AlsLocomotionModeTags::Grounded};
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
-	FGameplayTag RotationMode{AlsRotationModeTags::LookingDirection};
+	FGameplayTag RotationMode{AlsRotationModeTags::ViewDirection};
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
 	FGameplayTag Stance{AlsStanceTags::Standing};
@@ -86,10 +84,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
 	FGameplayTag LocomotionAction;
 
-	// Raw replicated view rotation. For smooth rotation use FAlsViewState::Rotation.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
+	FAlsMovementBaseState MovementBase;
+
+	// Replicated raw view rotation. In most cases, it's better to use FAlsViewState::Rotation to take advantage of network smoothing.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient,
-		ReplicatedUsing = "OnReplicated_RawViewRotation")
-	FRotator RawViewRotation;
+		ReplicatedUsing = "OnReplicated_ReplicatedViewRotation")
+	FRotator ReplicatedViewRotation;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
 	FAlsViewState ViewState;
@@ -173,10 +174,11 @@ public:
 	virtual void Restart();
 
 private:
+	void RefreshUsingAbsoluteRotation() const;
+
 	void RefreshVisibilityBasedAnimTickOption() const;
 
-public:
-	bool IsSimulatedProxyTeleported() const;
+	void RefreshMovementBase();
 
 	// View Mode
 
@@ -204,11 +206,10 @@ private:
 	void NotifyLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
 
 protected:
-
-	virtual void OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
-	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DisplayName = "On LocomotionMode Changed"))
-	void BpOnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
-
+	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
+	void OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
+	virtual void OnLocomotionModeChanged_Implementation(const FGameplayTag& PreviousLocomotionMode);
+	
 	// Desired Aiming
 
 public:
@@ -355,11 +356,9 @@ private:
 	void OnReplicated_OverlayMode(const FGameplayTag& PreviousOverlayMode);
 
 protected:
-	
-	virtual void OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
-	
-	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DispplayName = "On OverlayMode Changed"))
-	void BpOnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
+	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
+	void OnOverlayModeChanged(const FGameplayTag& PreviousOverlayMode);
+	virtual void OnOverlayModeChanged_Implementation(const FGameplayTag& PreviousOverlayMode);
 
 	// Locomotion Action
 
@@ -371,9 +370,10 @@ public:
 	void NotifyLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
 
 protected:
+	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
-	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DisplayName = "On LocomotionAction Changed"))
-	void BpOnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
+	virtual void OnLocomotionActionChanged_Implementation(const FGameplayTag& PreviousLocomotionAction);
+
 
 	// View
 
@@ -382,15 +382,13 @@ public:
 	virtual FRotator GetViewRotation() const;
 
 private:
-	void SetRawViewRotation(const FRotator& NewViewRotation);
+	void SetReplicatedViewRotation(const FRotator& NewViewRotation);
 
 	UFUNCTION(Server, Unreliable)
-	void ServerSetRawViewRotation(const FRotator& NewViewRotation);
-	virtual void ServerSetRawViewRotation_Implementation(const FRotator& NewViewRotation);
-
+	void ServerSetReplicatedViewRotation(const FRotator& NewViewRotation);
 
 	UFUNCTION()
-	void OnReplicated_RawViewRotation();
+	void OnReplicated_ReplicatedViewRotation();
 
 public:
 	void CorrectViewNetworkSmoothing(const FRotator& NewViewRotation);
@@ -413,9 +411,14 @@ public:
 private:
 	void SetInputDirection(FVector NewInputDirection);
 
-	void RefreshLocomotionLocationAndRotation(float DeltaTime);
+	void RefreshLocomotionLocationAndRotation();
+
+	void RefreshLocomotionEarly();
 
 	void RefreshLocomotion(float DeltaTime);
+
+	void RefreshLocomotionLate(float DeltaTime);
+
 
 	// Jumping
 
@@ -477,26 +480,6 @@ protected:
 
 	void RefreshViewRelativeTargetYawAngle();
 
-	// Rotation Lock
-
-public:
-	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
-	void LockRotation(float TargetYawAngle);
-
-	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
-	void UnLockRotation();
-
-private:
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastLockRotation(float TargetYawAngle);
-	virtual void MulticastLockRotation_Implementation(float TargetYawAngle);
-
-
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastUnLockRotation();
-	virtual void MulticastUnLockRotation_Implementation();
-
-
 	// Rolling
 
 public:
@@ -533,7 +516,6 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	bool IsMantlingAllowedToStart() const;
 	virtual bool IsMantlingAllowedToStart_Implementation() const;
-
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
 	bool TryStartMantlingGrounded();
@@ -669,11 +651,6 @@ private:
 	
 	
 };
-
-inline bool UAlsComponent::IsSimulatedProxyTeleported() const
-{
-	return bSimulatedProxyTeleported;
-}
 
 inline const FGameplayTag& UAlsComponent::GetViewMode() const
 {

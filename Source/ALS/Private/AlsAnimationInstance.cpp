@@ -486,7 +486,7 @@ void UAlsAnimationInstance::RefreshLocomotionOnGameThread()
 {
 	check(IsInGameThread())
 
-	const auto& Locomotion{Character->GetLocomotionState()};
+	const auto& Locomotion{AlsComponent->GetLocomotionState()};
 
 	LocomotionState.bHasInput = Locomotion.bHasInput;
 	LocomotionState.InputYawAngle = Locomotion.InputYawAngle;

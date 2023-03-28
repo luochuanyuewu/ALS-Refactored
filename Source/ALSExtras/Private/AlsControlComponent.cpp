@@ -262,7 +262,7 @@ void UAlsControlComponent::Input_OnRotationMode()
 	if (UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(PossessedCharacter))
 	{
 		AlsComponent->SetDesiredRotationMode(AlsComponent->GetDesiredRotationMode() == AlsRotationModeTags::VelocityDirection
-						   ? AlsRotationModeTags::LookingDirection
+						   ? AlsRotationModeTags::ViewDirection
 						   : AlsRotationModeTags::VelocityDirection);
 	}
 
