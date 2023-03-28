@@ -12,7 +12,7 @@ private:
 	using Super = FCharacterNetworkMoveData;
 
 public:
-	FGameplayTag RotationMode{AlsRotationModeTags::LookingDirection};
+	FGameplayTag RotationMode{AlsRotationModeTags::ViewDirection};
 
 	FGameplayTag Stance{AlsStanceTags::Standing};
 
@@ -39,7 +39,7 @@ private:
 	using Super = FSavedMove_Character;
 
 public:
-	FGameplayTag RotationMode{AlsRotationModeTags::LookingDirection};
+	FGameplayTag RotationMode{AlsRotationModeTags::ViewDirection};
 
 	FGameplayTag Stance{AlsStanceTags::Standing};
 
@@ -87,7 +87,7 @@ protected:
 	FAlsMovementGaitSettings GaitSettings;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
-	FGameplayTag RotationMode{AlsRotationModeTags::LookingDirection};
+	FGameplayTag RotationMode{AlsRotationModeTags::ViewDirection};
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", Transient)
 	FGameplayTag Stance{AlsStanceTags::Standing};
@@ -120,6 +120,8 @@ public:
 	virtual void SetMovementMode(EMovementMode NewMovementMode, uint8 NewCustomMode = 0) override;
 
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+
+	virtual void UpdateBasedRotation(FRotator& FinalRotation, const FRotator& ReducedRotation) override;
 
 	virtual float GetMaxAcceleration() const override;
 

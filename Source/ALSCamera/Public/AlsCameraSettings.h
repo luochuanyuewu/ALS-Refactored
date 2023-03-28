@@ -16,7 +16,7 @@ struct ALSCAMERA_API FAlsFirstPersonCameraSettings
 	float Fov{90.0f};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ALS")
-	FName CameraSocketName{TEXT("FirstPersonCamera")};
+	FName CameraSocketName{TEXTVIEW("FirstPersonCamera")};
 };
 
 USTRUCT(BlueprintType)
@@ -49,10 +49,10 @@ struct ALSCAMERA_API FAlsThirdPersonCameraSettings
 	TEnumAsByte<ETraceTypeQuery> TraceChannel{UEngineTypes::ConvertToTraceType(ECC_Visibility)};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ALS")
-	FName TraceShoulderLeftSocketName{TEXT("ThirdPersonTraceShoulderLeft")};
+	FName TraceShoulderLeftSocketName{TEXTVIEW("ThirdPersonTraceShoulderLeft")};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ALS")
-	FName TraceShoulderRightSocketName{TEXT("ThirdPersonTraceShoulderRight")};
+	FName TraceShoulderRightSocketName{TEXTVIEW("ThirdPersonTraceShoulderRight")};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ALS")
 	FVector3f TraceOverrideOffset{0.0f, 0.0f, 40.0f};
@@ -82,6 +82,11 @@ class ALSCAMERA_API UAlsCameraSettings : public UDataAsset
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings")
 	bool bIgnoreTimeDilation{true};
+
+	// The camera will be teleported if the character has moved further than this
+	// distance in 1 frame. If zero is specified, then teleportation will be disabled.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings", Meta = (ClampMin = 0, ForceUnits = "cm"))
+	float TeleportDistanceThreshold{200.0f};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings")
 	FAlsFirstPersonCameraSettings FirstPerson;

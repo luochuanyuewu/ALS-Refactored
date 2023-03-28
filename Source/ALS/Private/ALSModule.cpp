@@ -1,27 +1,41 @@
 #include "ALSModule.h"
 
+#if WITH_EDITOR
+#include "MessageLogModule.h"
+#endif
+
+#include "Utility/AlsLog.h"
 #include "AlsComponent.h"
 #include "GameFramework/HUD.h"
-#include "Modules/ModuleManager.h"
 
-#define LOCTEXT_NAMESPACE "FALSModule"
+IMPLEMENT_MODULE(FALSModule, ALS)
+
+#define LOCTEXT_NAMESPACE "ALSModule"
 
 void FALSModule::StartupModule()
 {
-	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
+	FDefaultModuleImpl::StartupModule();
+
+#if WITH_EDITOR
+	auto& MessageLog{FModuleManager::LoadModuleChecked<FMessageLogModule>(FName{TEXTVIEW("MessageLog")})};
+
+	FMessageLogInitializationOptions Options;
+	Options.bShowFilters = true;
+	Options.bAllowClear = true;
+	Options.bDiscardDuplicates = true;
+
+	MessageLog.RegisterLogListing(AlsLog::MessageLogName, LOCTEXT("MessageLogLabel", "ALS"), Options);
+	
 	if (!IsRunningDedicatedServer())
 	{
 		AHUD::OnShowDebugInfo.AddStatic(&UAlsComponent::OnShowDebugInfo);
 	}
+#endif
 }
 
 void FALSModule::ShutdownModule()
 {
-	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
-	// we call this function before unloading the module.
+	FDefaultModuleImpl::ShutdownModule();
 }
 
-IMPLEMENT_MODULE(FALSModule, ALS)
-
 #undef LOCTEXT_NAMESPACE
-

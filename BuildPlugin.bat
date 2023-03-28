@@ -8,6 +8,7 @@ set AutomationToolPath="%EngineDirectory%\Engine\Build\BatchFiles\RunUAT.bat"
 set PluginPath="%cd%\ALS.uplugin"
 set OutputPath="%cd%\Build"
 
+title Build Plugin
 echo Automation Tool Path: %AutomationToolPath%
 echo:
 

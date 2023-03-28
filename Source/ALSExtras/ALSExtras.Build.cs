@@ -7,6 +7,8 @@ public class ALSExtras : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_1;
 
+		bEnableNonInlinedGenCppWarnings = true;
+
 		PrivateDependencyModuleNames.AddRange(new[]
 		{
 			"Core", "CoreUObject","GameplayTags", "Engine", "EnhancedInput", "AIModule", "ALS", "ALSCamera"

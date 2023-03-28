@@ -44,27 +44,13 @@ void UAlsAnimationInstance::NativeInitializeAnimation()
 void UAlsAnimationInstance::NativeBeginPlay()
 {
 	Super::NativeBeginPlay();
-
+	
 	if (!IsValid(AlsComponent))
-	{
 		AlsComponent = UAlsComponent::FindAlsComponent(GetOwningActor());
-	}
 
-	if (!ALS_ENSURE(IsValid(Settings)) || !ALS_ENSURE(IsValid(Character)) || !ALS_ENSURE(IsValid(AlsComponent)))
-	{
-		return;
-	}
-
-	if (Character->GetLocalRole() >= ROLE_AutonomousProxy)
-	{
-		// Teleportation of simulated proxies is done in a different way.
-
-		Character->GetCapsuleComponent()->TransformUpdated.AddWeakLambda(
-			this, [this](USceneComponent*, const EUpdateTransformFlags, const ETeleportType TeleportType)
-			{
-				bTeleported |= TeleportType != ETeleportType::None;
-			});
-	}
+	ALS_ENSURE(IsValid(Settings));
+	ALS_ENSURE(IsValid(Character));
+	ALS_ENSURE(IsValid(AlsComponent));
 }
 
 void UAlsAnimationInstance::NativeUpdateAnimation(const float DeltaTime)
@@ -79,24 +65,28 @@ void UAlsAnimationInstance::NativeUpdateAnimation(const float DeltaTime)
 		return;
 	}
 
+	// AAlsCharacter::FinalizeRagdolling() should only be called from here, not from AAlsCharacter::StopRagdollingImplementation(),
+	// otherwise the character mesh can sometimes take a strange pose when transitioning from ragdoll states to animation states.
+
+	AlsComponent->FinalizeRagdolling();
+
 	if (GetSkelMeshComponent()->IsUsingAbsoluteRotation())
 	{
 		const auto& ActorTransform{Character->GetActorTransform()};
 
 		// Manually synchronize mesh rotation with character rotation.
 
-		GetSkelMeshComponent()->SetWorldRotation(ActorTransform.GetRotation() * Character->GetBaseRotationOffset());
+		GetSkelMeshComponent()->MoveComponent(
+			FVector::ZeroVector, ActorTransform.GetRotation() * Character->GetBaseRotationOffset(), false);
 
-		// Re-cache transforms because the skeletal mesh transform has changed before.
+		// Re-cache proxy transforms to match the modified mesh transform.
 
-		const auto& Proxy{GetProxyOnAnyThread<FAnimInstanceProxy>()};
+		const auto& Proxy{GetProxyOnGameThread<FAnimInstanceProxy>()};
 
 		const_cast<FTransform&>(Proxy.GetComponentTransform()) = GetSkelMeshComponent()->GetComponentTransform();
 		const_cast<FTransform&>(Proxy.GetComponentRelativeTransform()) = GetSkelMeshComponent()->GetRelativeTransform();
 		const_cast<FTransform&>(Proxy.GetActorTransform()) = ActorTransform;
 	}
-
-	bTeleported |= AlsComponent->IsSimulatedProxyTeleported();
 
 #if WITH_EDITORONLY_DATA && ENABLE_DRAW_DEBUG
 	bDisplayDebugTraces = UAlsUtility::ShouldDisplayDebugForActor(Character, UAlsConstants::TracesDisplayName());
@@ -116,8 +106,8 @@ void UAlsAnimationInstance::NativeUpdateAnimation(const float DeltaTime)
 		ResetGroundedEntryMode();
 	}
 
+	RefreshMovementBaseOnGameThread();
 	RefreshViewOnGameThread();
-
 	RefreshLocomotionOnGameThread();
 	RefreshGroundedOnGameThread();
 	RefreshInAirOnGameThread();
@@ -143,7 +133,6 @@ void UAlsAnimationInstance::NativeThreadSafeUpdateAnimation(const float DeltaTim
 	RefreshPose();
 
 	RefreshView(DeltaTime);
-
 	RefreshGrounded(DeltaTime);
 	RefreshInAir(DeltaTime);
 
@@ -182,7 +171,34 @@ void UAlsAnimationInstance::NativePostEvaluateAnimation()
 #endif
 
 	bPendingUpdate = false;
-	bTeleported = false;
+}
+
+void UAlsAnimationInstance::RefreshMovementBaseOnGameThread()
+{
+	const auto& BasedMovement{Character->GetBasedMovement()};
+
+	if (BasedMovement.MovementBase != MovementBase.Primitive || BasedMovement.BoneName != MovementBase.BoneName)
+	{
+		MovementBase.Primitive = BasedMovement.MovementBase;
+		MovementBase.BoneName = BasedMovement.BoneName;
+		MovementBase.bBaseChanged = true;
+	}
+	else
+	{
+		MovementBase.bBaseChanged = false;
+	}
+
+	MovementBase.bHasRelativeLocation = BasedMovement.HasRelativeLocation();
+	MovementBase.bHasRelativeRotation = MovementBase.bHasRelativeLocation && BasedMovement.bRelativeRotation;
+
+	const auto PreviousRotation{MovementBase.Rotation};
+
+	MovementBaseUtility::GetMovementBaseTransform(BasedMovement.MovementBase, BasedMovement.BoneName,
+	                                              MovementBase.Location, MovementBase.Rotation);
+
+	MovementBase.DeltaRotation = MovementBase.bHasRelativeLocation && !MovementBase.bBaseChanged
+		                             ? (MovementBase.Rotation * PreviousRotation.Inverse()).Rotator()
+		                             : FRotator::ZeroRotator;
 }
 
 void UAlsAnimationInstance::RefreshLayering()
@@ -323,8 +339,11 @@ void UAlsAnimationInstance::ReinitializeLookTowardsInput()
 	ViewState.LookTowardsInput.bReinitializationRequired = true;
 }
 
-void UAlsAnimationInstance::RefreshLookTowardsInput(const float DeltaTime)
+void UAlsAnimationInstance::RefreshLookTowardsInput()
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UAlsAnimationInstance::RefreshLookTowardsInput()"),
+	                            STAT_UAlsAnimationInstance_RefreshLookTowardsInput, STATGROUP_Als)
+
 	auto& LookTowardsInput{ViewState.LookTowardsInput};
 
 	LookTowardsInput.bReinitializationRequired |= bPendingUpdate;
@@ -336,6 +355,13 @@ void UAlsAnimationInstance::RefreshLookTowardsInput(const float DeltaTime)
 		LookTowardsInput.WorldYawAngle = FRotator3f::NormalizeAxis(CharacterYawAngle + LookTowardsInput.YawAngle);
 		LookTowardsInput.bReinitializationRequired = false;
 		return;
+	}
+
+	if (MovementBase.bHasRelativeRotation)
+	{
+		// Offset the angle to keep it relative to the movement base.
+
+		LookTowardsInput.WorldYawAngle = FRotator3f::NormalizeAxis(LookTowardsInput.WorldYawAngle + MovementBase.DeltaRotation.Yaw);
 	}
 
 	// Block look towards the input direction when the character is in the air to prevent head rotation "snap" when changing look sides.
@@ -367,7 +393,9 @@ void UAlsAnimationInstance::RefreshLookTowardsInput(const float DeltaTime)
 			DeltaYawAngle = LocomotionState.YawSpeed > 0.0f ? FMath::Abs(DeltaYawAngle) : -FMath::Abs(DeltaYawAngle);
 		}
 
-		const auto InterpolationAmount{UAlsMath::ExponentialDecay(DeltaTime, Settings->View.LookTowardsInputYawAngleInterpolationSpeed)};
+		const auto InterpolationAmount{
+			UAlsMath::ExponentialDecay(GetDeltaSeconds(), Settings->View.LookTowardsInputYawAngleInterpolationSpeed)
+		};
 
 		LookTowardsInput.YawAngle = FRotator3f::NormalizeAxis(YawAngle + DeltaYawAngle * InterpolationAmount);
 	}
@@ -384,8 +412,11 @@ void UAlsAnimationInstance::ReinitializeLookTowardsCamera()
 	ViewState.LookTowardsCamera.bReinitializationRequired = true;
 }
 
-void UAlsAnimationInstance::RefreshLookTowardsCamera(const float DeltaTime)
+void UAlsAnimationInstance::RefreshLookTowardsCamera()
 {
+	DECLARE_SCOPE_CYCLE_COUNTER(TEXT("UAlsAnimationInstance::RefreshLookTowardsCamera()"),
+	                            STAT_UAlsAnimationInstance_RefreshLookTowardsCamera, STATGROUP_Als)
+
 	auto& LookTowardsCamera{ViewState.LookTowardsCamera};
 
 	LookTowardsCamera.bReinitializationRequired |= bPendingUpdate;
@@ -397,6 +428,13 @@ void UAlsAnimationInstance::RefreshLookTowardsCamera(const float DeltaTime)
 		LookTowardsCamera.WorldYawAngle = FRotator3f::NormalizeAxis(CharacterYawAngle + LookTowardsCamera.YawAngle);
 		LookTowardsCamera.bReinitializationRequired = false;
 		return;
+	}
+
+	if (MovementBase.bHasRelativeRotation)
+	{
+		// Offset the angle to keep it relative to the movement base.
+
+		LookTowardsCamera.WorldYawAngle = FRotator3f::NormalizeAxis(LookTowardsCamera.WorldYawAngle + MovementBase.DeltaRotation.Yaw);
 	}
 
 	const auto TargetYawAngle{ViewState.YawAngle};
@@ -423,7 +461,9 @@ void UAlsAnimationInstance::RefreshLookTowardsCamera(const float DeltaTime)
 			DeltaYawAngle = LocomotionState.YawSpeed > 0.0f ? FMath::Abs(DeltaYawAngle) : -FMath::Abs(DeltaYawAngle);
 		}
 
-		const auto InterpolationAmount{UAlsMath::ExponentialDecay(DeltaTime, Settings->View.LookTowardsCameraRotationInterpolationSpeed)};
+		const auto InterpolationAmount{
+			UAlsMath::ExponentialDecay(GetDeltaSeconds(), Settings->View.LookTowardsCameraRotationInterpolationSpeed)
+		};
 
 		LookTowardsCamera.YawAngle = FRotator3f::NormalizeAxis(YawAngle + DeltaYawAngle * InterpolationAmount);
 		LookTowardsCamera.PitchAngle = UAlsMath::LerpAngle(LookTowardsCamera.PitchAngle, ViewState.PitchAngle, InterpolationAmount);
@@ -446,7 +486,7 @@ void UAlsAnimationInstance::RefreshLocomotionOnGameThread()
 {
 	check(IsInGameThread())
 
-	const auto& Locomotion{AlsComponent->GetLocomotionState()};
+	const auto& Locomotion{Character->GetLocomotionState()};
 
 	LocomotionState.bHasInput = Locomotion.bHasInput;
 	LocomotionState.InputYawAngle = Locomotion.InputYawAngle;
@@ -480,25 +520,6 @@ void UAlsAnimationInstance::RefreshLocomotionOnGameThread()
 
 	LocomotionState.CapsuleRadius = Capsule->GetScaledCapsuleRadius();
 	LocomotionState.CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-
-	const auto& BasedMovement{Character->GetBasedMovement()};
-
-	if (BasedMovement.MovementBase != LocomotionState.BasedMovement.Primitive ||
-	    BasedMovement.BoneName != LocomotionState.BasedMovement.BoneName)
-	{
-		LocomotionState.BasedMovement.Primitive = BasedMovement.MovementBase;
-		LocomotionState.BasedMovement.BoneName = BasedMovement.BoneName;
-		LocomotionState.BasedMovement.bBaseChanged = true;
-	}
-	else
-	{
-		LocomotionState.BasedMovement.bBaseChanged = false;
-	}
-
-	LocomotionState.BasedMovement.bHasRelativeLocation = BasedMovement.HasRelativeLocation();
-
-	MovementBaseUtility::GetMovementBaseTransform(BasedMovement.MovementBase, BasedMovement.BoneName,
-	                                              LocomotionState.BasedMovement.Location, LocomotionState.BasedMovement.Rotation);
 }
 
 void UAlsAnimationInstance::RefreshGroundedOnGameThread()
@@ -568,7 +589,7 @@ void UAlsAnimationInstance::RefreshGrounded(const float DeltaTime)
 void UAlsAnimationInstance::RefreshMovementDirection()
 {
 	// Calculate the movement direction. This value represents the direction the character is moving relative to the camera during
-	// the looking direction / aiming modes and is used in the cycle blending to blend to the appropriate directional states.
+	// the view direction / aiming rotation modes and is used in the cycle blending to blend to the appropriate directional states.
 
 	if (RotationMode == AlsRotationModeTags::VelocityDirection || Gait == AlsGaitTags::Sprinting)
 	{
@@ -832,16 +853,10 @@ void UAlsAnimationInstance::RefreshGroundPredictionAmount()
 		                                                      InAirState.VerticalVelocity) * LocomotionState.Scale
 	};
 
-	FCollisionObjectQueryParams ObjectQueryParameters;
-	for (const auto ObjectType : Settings->InAir.GroundPredictionSweepObjectTypes)
-	{
-		ObjectQueryParameters.AddObjectTypesToQuery(UCollisionProfile::Get()->ConvertToCollisionChannel(false, ObjectType));
-	}
-
 	FHitResult Hit;
-	GetWorld()->SweepSingleByObjectType(Hit, SweepStartLocation, SweepStartLocation + SweepVector, FQuat::Identity, ObjectQueryParameters,
-	                                    FCollisionShape::MakeCapsule(LocomotionState.CapsuleRadius, LocomotionState.CapsuleHalfHeight),
-	                                    {__FUNCTION__, false, Character});
+	GetWorld()->SweepSingleByChannel(Hit, SweepStartLocation, SweepStartLocation + SweepVector, FQuat::Identity, ECC_WorldStatic,
+	                                 FCollisionShape::MakeCapsule(LocomotionState.CapsuleRadius, LocomotionState.CapsuleHalfHeight),
+	                                 {__FUNCTION__, false, Character}, Settings->InAir.GroundPredictionSweepResponses);
 
 	const auto bGroundValid{Hit.IsValidBlockingHit() && Hit.ImpactNormal.Z >= LocomotionState.WalkableFloorZ};
 
@@ -969,7 +984,12 @@ void UAlsAnimationInstance::RefreshFoot(FAlsFootState& FootState, const FName& F
 
 void UAlsAnimationInstance::ProcessFootLockTeleport(FAlsFootState& FootState) const
 {
-	if (bPendingUpdate || !bTeleported || !FAnimWeight::IsRelevant(FootState.IkAmount * FootState.LockAmount))
+	// Due to network smoothing, we assume that teleportation occurs over a short period of time, not
+	// in one frame, since after accepting the teleportation event, the character can still be moved for
+	// some indefinite time, and this must be taken into account in order to avoid foot locking glitches.
+
+	if (bPendingUpdate || GetWorld()->TimeSince(TeleportedTime) > 0.2f ||
+	    !FAnimWeight::IsRelevant(FootState.IkAmount * FootState.LockAmount))
 	{
 		return;
 	}
@@ -979,13 +999,11 @@ void UAlsAnimationInstance::ProcessFootLockTeleport(FAlsFootState& FootState) co
 	FootState.LockLocation = ComponentTransform.TransformPosition(FootState.LockComponentRelativeLocation);
 	FootState.LockRotation = ComponentTransform.TransformRotation(FootState.LockComponentRelativeRotation);
 
-	if (LocomotionState.BasedMovement.bHasRelativeLocation)
+	if (MovementBase.bHasRelativeLocation)
 	{
-		const auto BaseRotationInverse{LocomotionState.BasedMovement.Rotation.Inverse()};
+		const auto BaseRotationInverse{MovementBase.Rotation.Inverse()};
 
-		FootState.LockMovementBaseRelativeLocation = BaseRotationInverse
-			.RotateVector(FootState.LockLocation - LocomotionState.BasedMovement.Location);
-
+		FootState.LockMovementBaseRelativeLocation = BaseRotationInverse.RotateVector(FootState.LockLocation - MovementBase.Location);
 		FootState.LockMovementBaseRelativeRotation = BaseRotationInverse * FootState.LockRotation;
 	}
 }
@@ -993,8 +1011,7 @@ void UAlsAnimationInstance::ProcessFootLockTeleport(FAlsFootState& FootState) co
 void UAlsAnimationInstance::ProcessFootLockBaseChange(FAlsFootState& FootState, const FTransform& ComponentTransformInverse) const
 {
 	// ReSharper disable once CppRedundantParentheses
-	if ((!bPendingUpdate && !LocomotionState.BasedMovement.bBaseChanged) ||
-	    !FAnimWeight::IsRelevant(FootState.IkAmount * FootState.LockAmount))
+	if ((!bPendingUpdate && !MovementBase.bBaseChanged) || !FAnimWeight::IsRelevant(FootState.IkAmount * FootState.LockAmount))
 	{
 		return;
 	}
@@ -1008,13 +1025,11 @@ void UAlsAnimationInstance::ProcessFootLockBaseChange(FAlsFootState& FootState, 
 	FootState.LockComponentRelativeLocation = ComponentTransformInverse.TransformPosition(FootState.LockLocation);
 	FootState.LockComponentRelativeRotation = ComponentTransformInverse.TransformRotation(FootState.LockRotation);
 
-	if (LocomotionState.BasedMovement.bHasRelativeLocation)
+	if (MovementBase.bHasRelativeLocation)
 	{
-		const auto BaseRotationInverse{LocomotionState.BasedMovement.Rotation.Inverse()};
+		const auto BaseRotationInverse{MovementBase.Rotation.Inverse()};
 
-		FootState.LockMovementBaseRelativeLocation =
-			BaseRotationInverse.RotateVector(FootState.LockLocation - LocomotionState.BasedMovement.Location);
-
+		FootState.LockMovementBaseRelativeLocation = BaseRotationInverse.RotateVector(FootState.LockLocation - MovementBase.Location);
 		FootState.LockMovementBaseRelativeRotation = BaseRotationInverse * FootState.LockRotation;
 	}
 	else
@@ -1089,13 +1104,11 @@ void UAlsAnimationInstance::RefreshFootLock(FAlsFootState& FootState, const FNam
 				FootState.LockRotation = FinalRotation;
 			}
 
-			if (LocomotionState.BasedMovement.bHasRelativeLocation)
+			if (MovementBase.bHasRelativeLocation)
 			{
-				const auto BaseRotationInverse{LocomotionState.BasedMovement.Rotation.Inverse()};
+				const auto BaseRotationInverse{MovementBase.Rotation.Inverse()};
 
-				FootState.LockMovementBaseRelativeLocation = BaseRotationInverse.
-					RotateVector(FinalLocation - LocomotionState.BasedMovement.Location);
-
+				FootState.LockMovementBaseRelativeLocation = BaseRotationInverse.RotateVector(FinalLocation - MovementBase.Location);
 				FootState.LockMovementBaseRelativeRotation = BaseRotationInverse * FinalRotation;
 			}
 			else
@@ -1112,12 +1125,10 @@ void UAlsAnimationInstance::RefreshFootLock(FAlsFootState& FootState, const FNam
 		FootState.LockAmount = NewFootLockAmount;
 	}
 
-	if (LocomotionState.BasedMovement.bHasRelativeLocation)
+	if (MovementBase.bHasRelativeLocation)
 	{
-		FootState.LockLocation = LocomotionState.BasedMovement.Location +
-		                         LocomotionState.BasedMovement.Rotation.RotateVector(FootState.LockMovementBaseRelativeLocation);
-
-		FootState.LockRotation = LocomotionState.BasedMovement.Rotation * FootState.LockMovementBaseRelativeRotation;
+		FootState.LockLocation = MovementBase.Location + MovementBase.Rotation.RotateVector(FootState.LockMovementBaseRelativeLocation);
+		FootState.LockRotation = MovementBase.Rotation * FootState.LockMovementBaseRelativeRotation;
 	}
 
 	FootState.LockComponentRelativeLocation = ComponentTransformInverse.TransformPosition(FootState.LockLocation);
@@ -1192,7 +1203,7 @@ void UAlsAnimationInstance::RefreshFootOffset(FAlsFootState& FootState, const fl
 		}
 		else
 		{
-			const_cast<TArray<TFunction<void()>>&>(DisplayDebugTracesQueue).Add([this, Hit, bGroundValid]
+			DisplayDebugTracesQueue.Add([this, Hit, bGroundValid]
 				{
 					UAlsUtility::DrawDebugLineTraceSingle(GetWorld(), Hit.TraceStart, Hit.TraceEnd, bGroundValid,
 					                                      Hit, {0.0f, 0.25f, 1.0f}, {0.0f, 0.75f, 1.0f});
@@ -1236,9 +1247,9 @@ void UAlsAnimationInstance::RefreshFootOffset(FAlsFootState& FootState, const fl
 		static constexpr auto LocationInterpolationDampingRatio{4.0f};
 		static constexpr auto LocationInterpolationTargetVelocityAmount{1.0f};
 
-		FootState.OffsetLocation = UAlsMath::SpringDamp(FootState.OffsetLocation, FootState.OffsetTargetLocation,
-		                                                FootState.OffsetSpringState, DeltaTime, LocationInterpolationFrequency,
-		                                                LocationInterpolationDampingRatio, LocationInterpolationTargetVelocityAmount);
+		FootState.OffsetLocation = UAlsMath::SpringDampVector(FootState.OffsetLocation, FootState.OffsetTargetLocation,
+		                                                      FootState.OffsetSpringState, DeltaTime, LocationInterpolationFrequency,
+		                                                      LocationInterpolationDampingRatio, LocationInterpolationTargetVelocityAmount);
 
 		static constexpr auto RotationInterpolationSpeed{30.0f};
 
@@ -1518,7 +1529,7 @@ void UAlsAnimationInstance::RefreshRotateInPlace(const float DeltaTime)
 
 bool UAlsAnimationInstance::IsTurnInPlaceAllowed()
 {
-	return RotationMode == AlsRotationModeTags::LookingDirection && ViewMode != AlsViewModeTags::FirstPerson;
+	return RotationMode == AlsRotationModeTags::ViewDirection && ViewMode != AlsViewModeTags::FirstPerson;
 }
 
 void UAlsAnimationInstance::RefreshTurnInPlace(const float DeltaTime)
@@ -1680,13 +1691,6 @@ void UAlsAnimationInstance::StopRagdolling()
 	// Save a snapshot of the current ragdoll pose for use in animation graph to blend out of the ragdoll.
 
 	SnapshotPose(RagdollingState.FinalRagdollPose);
-}
-
-void UAlsAnimationInstance::FinalizeRagdolling() const
-{
-	check(IsInGameThread())
-
-	AlsComponent->FinalizeRagdolling();
 }
 
 float UAlsAnimationInstance::GetCurveValueClamped01(const FName& CurveName) const

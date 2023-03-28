@@ -1,11 +1,11 @@
 #pragma once
 
+#include "Modules/ModuleManager.h"
 
-class FALSModule : public IModuleInterface
+class ALS_API FALSModule : public FDefaultModuleImpl
 {
 public:
-
-	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
+
 	virtual void ShutdownModule() override;
 };
