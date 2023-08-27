@@ -1,6 +1,5 @@
 #include "Notifies/AlsAnimNotify_FootstepEffects.h"
 
-#include "AlsCharacter.h"
 #include "DrawDebugHelpers.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Animation/AnimInstance.h"
@@ -18,6 +17,8 @@
 #include "Utility/AlsUtility.h"
 
 // ReSharper disable once CppUnusedIncludeDirective
+#include "AlsComponent.h"
+
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsAnimNotify_FootstepEffects)
 
 FString UAlsAnimNotify_FootstepEffects::GetNotifyName_Implementation() const

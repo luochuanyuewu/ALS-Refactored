@@ -11,7 +11,7 @@ class UAlsCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 
-UCLASS(ClassGroup=(Als), meta=(BlueprintSpawnableComponent))
+UCLASS(ClassGroup=(Als), meta=(BlueprintSpawnableComponent), Blueprintable)
 class ALSEXTRAS_API UAlsControlComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -28,8 +28,8 @@ protected:
 	virtual void OnUnregister() override;
 
 	UFUNCTION(BlueprintNativeEvent)
-	void OnPossessedPawnChanged( APawn* OldPawn, APawn* NewPawn);
-	virtual void OnPossessedPawnChanged_Implementation( APawn* OldPawn, APawn* NewPawn);
+	void OnPossessedPawnChanged(APawn* OldPawn, APawn* NewPawn);
+	virtual void OnPossessedPawnChanged_Implementation(APawn* OldPawn, APawn* NewPawn);
 
 	UFUNCTION()
 	virtual void SetupInputComponent(UInputComponent* InputComponent);
@@ -64,19 +64,16 @@ protected:
 	void Input_OnViewMode();
 
 	void Input_OnSwitchShoulder();
-	
 
 public:
-
 	UPROPERTY()
 	TObjectPtr<APlayerController> OwnerController = nullptr;
-	
+
 	/** Main character reference */
 	UPROPERTY(BlueprintReadOnly, Category = "ALS")
 	TObjectPtr<ACharacter> PossessedCharacter = nullptr;
 
 protected:
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Settings|Als Control", Meta = (DisplayThumbnail = false))
 	TObjectPtr<UInputMappingContext> InputMappingContext;
 
@@ -120,10 +117,10 @@ protected:
 	TObjectPtr<UInputAction> SwitchShoulderAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Als Control", Meta = (ClampMin = 0, ForceUnits = "x"))
-	float LookUpMouseSensitivity{3.0f};
+	float LookUpMouseSensitivity{1.0f};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Als Control", Meta = (ClampMin = 0, ForceUnits = "x"))
-	float LookRightMouseSensitivity{3.0f};
+	float LookRightMouseSensitivity{1.0f};
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Als Control",
 		Meta = (ClampMin = 0, ForceUnits = "deg/s"))
@@ -132,13 +129,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings|Als Control",
 		Meta = (ClampMin = 0, ForceUnits = "deg/s"))
 	float LookRightRate{240.0f};
-	
-	
+
+
 	bool bAlreadySetup = false;
 	bool bAlreadyBoundInput = false;
 
 	FTimerHandle Timer_CheckInputComponent;
-
 };
-
-

@@ -61,7 +61,7 @@ void UAlsAnimationInstance::NativeUpdateAnimation(const float DeltaTime)
 
 	Super::NativeUpdateAnimation(DeltaTime);
 
-	if (!IsValid(Settings) || !IsValid(Character) || !IsValid(AlsComponent))
+	if (!IsValid(Settings) || !IsValid(Character) || !IsValid(AlsComponent) || !IsValid(Character->GetCharacterMovement()))
 	{
 		return;
 	}

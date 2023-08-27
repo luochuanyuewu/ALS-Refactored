@@ -1,5 +1,4 @@
-﻿#include "AlsCharacterMovementComponent.h"
-#include "AlsComponent.h"
+﻿#include "AlsComponent.h"
 
 #include "DisplayDebugHelpers.h"
 #include "Animation/AnimInstance.h"
@@ -7,7 +6,6 @@
 #include "Engine/Canvas.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/HUD.h"
-#include "Misc/DataValidation.h"
 #include "Utility/AlsConstants.h"
 #include "Utility/AlsMath.h"
 #include "Utility/AlsUtility.h"

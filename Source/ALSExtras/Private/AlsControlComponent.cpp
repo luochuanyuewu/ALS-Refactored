@@ -24,28 +24,29 @@ UAlsControlComponent::UAlsControlComponent()
 void UAlsControlComponent::OnRegister()
 {
 	Super::OnRegister();
-	if (APlayerController* PC =  Cast<APlayerController>(GetOwner()))
+	if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
 	{
 		OwnerController = PC;
-		PC->OnPossessedPawnChanged.AddDynamic(this,&ThisClass::UAlsControlComponent::OnPossessedPawnChanged);
+		PC->OnPossessedPawnChanged.AddDynamic(this, &ThisClass::UAlsControlComponent::OnPossessedPawnChanged);
 	}
 }
 
 void UAlsControlComponent::OnUnregister()
 {
-	if (APlayerController* PC =  Cast<APlayerController>(GetOwner()))
+	if (APlayerController* PC = Cast<APlayerController>(GetOwner()))
 	{
-		PC->OnPossessedPawnChanged.RemoveDynamic(this,&ThisClass::UAlsControlComponent::OnPossessedPawnChanged);
+		PC->OnPossessedPawnChanged.RemoveDynamic(this, &ThisClass::UAlsControlComponent::OnPossessedPawnChanged);
 	}
 	Super::OnUnregister();
 }
 
 
-
 void UAlsControlComponent::OnPossessedPawnChanged_Implementation(APawn* OldPawn, APawn* NewPawn)
 {
 	if (bAlreadySetup)
+	{
 		return;
+	}
 	PossessedCharacter = Cast<ACharacter>(NewPawn);
 
 	SetupInputs();
@@ -56,7 +57,9 @@ void UAlsControlComponent::OnPossessedPawnChanged_Implementation(APawn* OldPawn,
 void UAlsControlComponent::SetupInputComponent(UInputComponent* InputComponent)
 {
 	if (bAlreadyBoundInput)
+	{
 		return;
+	}
 	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent);
 	if (EnhancedInput)
 	{
@@ -84,7 +87,7 @@ void UAlsControlComponent::SetupInputComponent(UInputComponent* InputComponent)
 
 void UAlsControlComponent::OnCheckInputComponent()
 {
-	if (OwnerController!= nullptr && OwnerController->InputComponent != nullptr)
+	if (OwnerController != nullptr && OwnerController->InputComponent != nullptr)
 	{
 		if (bAlreadySetup)
 		{
@@ -102,12 +105,12 @@ void UAlsControlComponent::BeginPlay()
 	{
 		if (OwnerController->GetPawn() != nullptr)
 		{
-			OnPossessedPawnChanged(nullptr,OwnerController->GetPawn());	
+			OnPossessedPawnChanged(nullptr, OwnerController->GetPawn());
 		}
 	}
 	if (!bAlreadyBoundInput)
 	{
-		GetWorld()->GetTimerManager().SetTimer(Timer_CheckInputComponent,FTimerDelegate::CreateUObject(this,&ThisClass::OnCheckInputComponent),0.2f,true);
+		GetWorld()->GetTimerManager().SetTimer(Timer_CheckInputComponent, FTimerDelegate::CreateUObject(this, &ThisClass::OnCheckInputComponent), 0.2f, true);
 	}
 }
 
@@ -136,16 +139,13 @@ void UAlsControlComponent::Input_OnLook(const FInputActionValue& ActionValue)
 {
 	const auto Value{ActionValue.Get<FVector2D>()};
 
-	const auto TimeDilation{PossessedCharacter->GetWorldSettings()->GetEffectiveTimeDilation()};
-	const auto DeltaTime{TimeDilation > UE_SMALL_NUMBER ? GetWorld()->GetDeltaSeconds() / TimeDilation : GetWorld()->DeltaRealTimeSeconds};
-
-	PossessedCharacter->AddControllerPitchInput(Value.Y * LookUpRate * DeltaTime);
-	PossessedCharacter->AddControllerYawInput(Value.X * LookRightRate * DeltaTime);
+	PossessedCharacter->AddControllerPitchInput(Value.Y * LookUpRate);
+	PossessedCharacter->AddControllerYawInput(Value.X * LookRightRate);
 }
 
 void UAlsControlComponent::Input_OnMove(const FInputActionValue& ActionValue)
 {
-	if (UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(PossessedCharacter))
+	if (const UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(PossessedCharacter))
 	{
 		const auto Value{UAlsMath::ClampMagnitude012D(ActionValue.Get<FVector2D>())};
 
@@ -192,7 +192,6 @@ void UAlsControlComponent::Input_OnCrouch()
 			AlsComponent->SetDesiredStance(AlsStanceTags::Standing);
 		}
 	}
-
 }
 
 void UAlsControlComponent::Input_OnJump(const FInputActionValue& ActionValue)
@@ -224,7 +223,6 @@ void UAlsControlComponent::Input_OnJump(const FInputActionValue& ActionValue)
 			PossessedCharacter->StopJumping();
 		}
 	}
-
 }
 
 void UAlsControlComponent::Input_OnAim(const FInputActionValue& ActionValue)
@@ -254,7 +252,6 @@ void UAlsControlComponent::Input_OnRoll()
 
 		AlsComponent->TryStartRolling(PlayRate);
 	}
-
 }
 
 void UAlsControlComponent::Input_OnRotationMode()
@@ -262,10 +259,9 @@ void UAlsControlComponent::Input_OnRotationMode()
 	if (UAlsComponent* AlsComponent = UAlsComponent::FindAlsComponent(PossessedCharacter))
 	{
 		AlsComponent->SetDesiredRotationMode(AlsComponent->GetDesiredRotationMode() == AlsRotationModeTags::VelocityDirection
-						   ? AlsRotationModeTags::ViewDirection
-						   : AlsRotationModeTags::VelocityDirection);
+			                                     ? AlsRotationModeTags::ViewDirection
+			                                     : AlsRotationModeTags::VelocityDirection);
 	}
-
 }
 
 void UAlsControlComponent::Input_OnViewMode()

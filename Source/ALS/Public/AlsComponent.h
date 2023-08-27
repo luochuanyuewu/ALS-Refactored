@@ -28,7 +28,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMantlingStartedSignature,const FAls
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);
 
 
-
+/**
+ *  AlsComponent
+ * @brief reference to ASimpleAlsCharacter for integration。
+ */
 UCLASS(ClassGroup="Als", BlueprintType, Blueprintable, meta=(BlueprintSpawnableComponent),
 	AutoExpandCategories = ("Settings|Als Character", "Settings|Als Character|Desired State", "State|Als Character"))
 class ALS_API UAlsComponent : public UActorComponent
