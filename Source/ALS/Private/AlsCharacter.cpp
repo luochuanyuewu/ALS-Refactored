@@ -4,13 +4,14 @@
 #include "AlsCharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Curves/CurveFloat.h"
 #include "GameFramework/GameNetworkManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "Settings/AlsCharacterSettings.h"
 #include "Utility/AlsConstants.h"
-#include "Utility/AlsLog.h"
 #include "Utility/AlsMacros.h"
 #include "Utility/AlsUtility.h"
 
@@ -18,7 +19,7 @@
 
 namespace AlsCharacterConstants
 {
-	inline static constexpr auto TeleportDistanceThresholdSquared{FMath::Square(50.0f)};
+	constexpr auto TeleportDistanceThresholdSquared{FMath::Square(50.0f)};
 }
 
 AAlsCharacter::AAlsCharacter(const FObjectInitializer& ObjectInitializer) : Super{
@@ -36,10 +37,7 @@ AAlsCharacter::AAlsCharacter(const FObjectInitializer& ObjectInitializer) : Supe
 	GetMesh()->SetRelativeRotation_Direct({0.0f, -90.0f, 0.0f});
 
 	GetMesh()->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
-
 	GetMesh()->bEnableUpdateRateOptimizations = false;
-
-	GetMesh()->bUpdateJointsFromAnimation = true; // Required for the flail animation to work properly when ragdolling.
 
 	AlsCharacterMovement = Cast<UAlsCharacterMovementComponent>(GetCharacterMovement());
 
@@ -80,6 +78,7 @@ void AAlsCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, ReplicatedViewRotation, Parameters)
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, InputDirection, Parameters)
+	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, DesiredVelocityYawAngle, Parameters)
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, RagdollTargetLocation, Parameters)
 }
 
@@ -116,7 +115,7 @@ void AAlsCharacter::PreRegisterAllComponents()
 
 void AAlsCharacter::PostInitializeComponents()
 {
-	// Make sure the mesh and animation blueprint update after the character to guarantee it gets the most recent values.
+	// Make sure the mesh and animation blueprint are ticking after the character so they can access the most up-to-date character state.
 
 	GetMesh()->AddTickPrerequisiteActor(this);
 
@@ -265,6 +264,8 @@ void AAlsCharacter::Tick(const float DeltaTime)
 
 	RefreshMovementBase();
 
+	RefreshInput(DeltaTime);
+
 	RefreshLocomotionEarly();
 
 	RefreshView(DeltaTime);
@@ -392,7 +393,7 @@ void AAlsCharacter::SetViewMode(const FGameplayTag& NewViewMode)
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetViewMode(NewViewMode);
+			ServerSetViewMode(ViewMode);
 		}
 	}
 }
@@ -457,7 +458,7 @@ void AAlsCharacter::NotifyLocomotionModeChanged(const FGameplayTag& PreviousLoco
 
 			StartRolling(PlayRate, LocomotionState.bHasSpeed
 				                       ? LocomotionState.VelocityYawAngle
-				                       : UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(GetActorRotation().Yaw)));
+				                       : UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(GetActorRotation().Yaw)));
 		}
 		else
 		{
@@ -504,11 +505,11 @@ void AAlsCharacter::SetDesiredAiming(const bool bNewDesiredAiming)
 
 		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, bDesiredAiming, this)
 
-		OnDesiredAimingChanged(!bNewDesiredAiming);
+		OnDesiredAimingChanged(!bDesiredAiming);
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredAiming(bNewDesiredAiming);
+			ServerSetDesiredAiming(bDesiredAiming);
 		}
 	}
 }
@@ -535,7 +536,7 @@ void AAlsCharacter::SetDesiredRotationMode(const FGameplayTag& NewDesiredRotatio
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredRotationMode(NewDesiredRotationMode);
+			ServerSetDesiredRotationMode(DesiredRotationMode);
 		}
 	}
 }
@@ -660,7 +661,7 @@ void AAlsCharacter::SetDesiredStance(const FGameplayTag& NewDesiredStance)
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredStance(NewDesiredStance);
+			ServerSetDesiredStance(DesiredStance);
 		}
 
 		ApplyDesiredStance();
@@ -772,7 +773,7 @@ void AAlsCharacter::SetDesiredGait(const FGameplayTag& NewDesiredGait)
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredGait(NewDesiredGait);
+			ServerSetDesiredGait(DesiredGait);
 		}
 	}
 }
@@ -857,7 +858,6 @@ bool AAlsCharacter::CanSprint() const
 	// input and if the input direction is aligned with the view direction within 50 degrees.
 
 	if (!LocomotionState.bHasInput || Stance != AlsStanceTags::Standing ||
-	    // ReSharper disable once CppRedundantParentheses
 	    (RotationMode == AlsRotationModeTags::Aiming && !Settings->bSprintHasPriorityOverAiming))
 	{
 		return false;
@@ -871,8 +871,8 @@ bool AAlsCharacter::CanSprint() const
 
 	static constexpr auto ViewRelativeAngleThreshold{50.0f};
 
-	if (FMath::Abs(FRotator3f::NormalizeAxis(
-		    LocomotionState.InputYawAngle - UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw))) < ViewRelativeAngleThreshold)
+	if (FMath::Abs(FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
+		    LocomotionState.InputYawAngle - ViewState.Rotation.Yaw))) < ViewRelativeAngleThreshold)
 	{
 		return true;
 	}
@@ -894,7 +894,7 @@ void AAlsCharacter::SetOverlayMode(const FGameplayTag& NewOverlayMode)
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetOverlayMode(NewOverlayMode);
+			ServerSetOverlayMode(OverlayMode);
 		}
 	}
 }
@@ -937,6 +937,28 @@ FRotator AAlsCharacter::GetViewRotation() const
 	return ViewState.Rotation;
 }
 
+void AAlsCharacter::SetInputDirection(FVector NewInputDirection)
+{
+	NewInputDirection = NewInputDirection.GetSafeNormal();
+
+	COMPARE_ASSIGN_AND_MARK_PROPERTY_DIRTY(ThisClass, InputDirection, NewInputDirection, this);
+}
+
+void AAlsCharacter::RefreshInput(const float DeltaTime)
+{
+	if (GetLocalRole() >= ROLE_AutonomousProxy)
+	{
+		SetInputDirection(GetCharacterMovement()->GetCurrentAcceleration() / GetCharacterMovement()->GetMaxAcceleration());
+	}
+
+	LocomotionState.bHasInput = InputDirection.SizeSquared() > UE_KINDA_SMALL_NUMBER;
+
+	if (LocomotionState.bHasInput)
+	{
+		LocomotionState.InputYawAngle = UE_REAL_TO_FLOAT(UAlsMath::DirectionToAngleXY(InputDirection));
+	}
+}
+
 void AAlsCharacter::SetReplicatedViewRotation(const FRotator& NewViewRotation)
 {
 	if (ReplicatedViewRotation != NewViewRotation)
@@ -950,7 +972,7 @@ void AAlsCharacter::SetReplicatedViewRotation(const FRotator& NewViewRotation)
 
 		if (!IsReplicatingMovement() && GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetReplicatedViewRotation(NewViewRotation);
+			ServerSetReplicatedViewRotation(ReplicatedViewRotation);
 		}
 	}
 }
@@ -1042,7 +1064,6 @@ void AAlsCharacter::RefreshView(const float DeltaTime)
 
 	ViewState.PreviousYawAngle = UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw);
 
-	// ReSharper disable once CppRedundantParentheses
 	if ((IsReplicatingMovement() && GetLocalRole() >= ROLE_AutonomousProxy) || IsLocallyControlled())
 	{
 		SetReplicatedViewRotation(Super::GetViewRotation().GetNormalized());
@@ -1055,7 +1076,7 @@ void AAlsCharacter::RefreshView(const float DeltaTime)
 	// Set the yaw speed by comparing the current and previous view yaw angle, divided by
 	// delta seconds. This represents the speed the camera is rotating from left to right.
 
-	ViewState.YawSpeed = FMath::Abs(UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw) - ViewState.PreviousYawAngle) / DeltaTime;
+	ViewState.YawSpeed = FMath::Abs(UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw - ViewState.PreviousYawAngle)) / DeltaTime;
 }
 
 void AAlsCharacter::RefreshViewNetworkSmoothing(const float DeltaTime)
@@ -1104,11 +1125,9 @@ void AAlsCharacter::RefreshViewNetworkSmoothing(const float DeltaTime)
 	}
 }
 
-void AAlsCharacter::SetInputDirection(FVector NewInputDirection)
+void AAlsCharacter::SetDesiredVelocityYawAngle(const float NewDesiredVelocityYawAngle)
 {
-	NewInputDirection = NewInputDirection.GetSafeNormal();
-
-	COMPARE_ASSIGN_AND_MARK_PROPERTY_DIRTY(ThisClass, InputDirection, NewInputDirection, this);
+	COMPARE_ASSIGN_AND_MARK_PROPERTY_DIRTY(ThisClass, DesiredVelocityYawAngle, NewDesiredVelocityYawAngle, this);
 }
 
 void AAlsCharacter::RefreshLocomotionLocationAndRotation()
@@ -1175,20 +1194,6 @@ void AAlsCharacter::RefreshLocomotionEarly()
 
 void AAlsCharacter::RefreshLocomotion(const float DeltaTime)
 {
-	if (GetLocalRole() >= ROLE_AutonomousProxy)
-	{
-		SetInputDirection(GetCharacterMovement()->GetCurrentAcceleration() / GetCharacterMovement()->GetMaxAcceleration());
-	}
-
-	// If the character has the input, update the input yaw angle.
-
-	LocomotionState.bHasInput = InputDirection.SizeSquared() > UE_KINDA_SMALL_NUMBER;
-
-	if (LocomotionState.bHasInput)
-	{
-		LocomotionState.InputYawAngle = UE_REAL_TO_FLOAT(UAlsMath::DirectionToAngleXY(InputDirection));
-	}
-
 	LocomotionState.Velocity = GetVelocity();
 
 	// Determine if the character is moving by getting its speed. The speed equals the length
@@ -1197,18 +1202,30 @@ void AAlsCharacter::RefreshLocomotion(const float DeltaTime)
 	// be useful to know the last orientation of a movement even after the character has stopped.
 
 	LocomotionState.Speed = UE_REAL_TO_FLOAT(LocomotionState.Velocity.Size2D());
-	LocomotionState.bHasSpeed = LocomotionState.Speed >= 1.0f;
+
+	static constexpr auto HasSpeedThreshold{1.0f};
+
+	LocomotionState.bHasSpeed = LocomotionState.Speed >= HasSpeedThreshold;
 
 	if (LocomotionState.bHasSpeed)
 	{
 		LocomotionState.VelocityYawAngle = UE_REAL_TO_FLOAT(UAlsMath::DirectionToAngleXY(LocomotionState.Velocity));
 	}
 
+	if (Settings->bRotateTowardsDesiredVelocityInVelocityDirectionRotationMode && GetLocalRole() >= ROLE_AutonomousProxy)
+	{
+		FVector DesiredVelocity;
+
+		SetDesiredVelocityYawAngle(AlsCharacterMovement->TryConsumePrePenetrationAdjustmentVelocity(DesiredVelocity) &&
+		                           DesiredVelocity.Size2D() >= HasSpeedThreshold
+			                           ? UE_REAL_TO_FLOAT(UAlsMath::DirectionToAngleXY(DesiredVelocity))
+			                           : LocomotionState.VelocityYawAngle);
+	}
+
 	LocomotionState.Acceleration = (LocomotionState.Velocity - LocomotionState.PreviousVelocity) / DeltaTime;
 
 	// Character is moving if has speed and current acceleration, or if the speed is greater than the moving speed threshold.
 
-	// ReSharper disable once CppRedundantParentheses
 	LocomotionState.bMoving = (LocomotionState.bHasInput && LocomotionState.bHasSpeed) ||
 	                          LocomotionState.Speed > Settings->MovingSpeedThreshold;
 }
@@ -1221,8 +1238,8 @@ void AAlsCharacter::RefreshLocomotionLate(const float DeltaTime)
 		RefreshTargetYawAngleUsingLocomotionRotation();
 	}
 
-	LocomotionState.YawSpeed = FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw) -
-	                                                     LocomotionState.PreviousYawAngle) / DeltaTime;
+	LocomotionState.YawSpeed = FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
+		                           LocomotionState.Rotation.Yaw - LocomotionState.PreviousYawAngle)) / DeltaTime;
 }
 
 void AAlsCharacter::Jump()
@@ -1342,8 +1359,11 @@ void AAlsCharacter::RefreshGroundedRotation(const float DeltaTime)
 
 		static constexpr auto TargetYawAngleRotationSpeed{800.0f};
 
-		RefreshRotationExtraSmooth(LocomotionState.VelocityYawAngle, DeltaTime,
-		                           CalculateRotationInterpolationSpeed(), TargetYawAngleRotationSpeed);
+		RefreshRotationExtraSmooth(
+			Settings->bRotateTowardsDesiredVelocityInVelocityDirectionRotationMode
+				? DesiredVelocityYawAngle
+				: LocomotionState.VelocityYawAngle,
+			DeltaTime, CalculateRotationInterpolationSpeed(), TargetYawAngleRotationSpeed);
 		return;
 	}
 
@@ -1352,8 +1372,8 @@ void AAlsCharacter::RefreshGroundedRotation(const float DeltaTime)
 		const auto TargetYawAngle{
 			Gait == AlsGaitTags::Sprinting
 				? LocomotionState.VelocityYawAngle
-				: UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw) +
-				  GetMesh()->GetAnimInstance()->GetCurveValue(UAlsConstants::RotationYawOffsetCurveName())
+				: UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw +
+					GetMesh()->GetAnimInstance()->GetCurveValue(UAlsConstants::RotationYawOffsetCurveName()))
 		};
 
 		static constexpr auto TargetYawAngleRotationSpeed{500.0f};
@@ -1416,10 +1436,8 @@ void AAlsCharacter::RefreshGroundedNotMovingAimingRotation(const float DeltaTime
 			ViewRelativeYawAngle -= 360.0f;
 		}
 
-		RefreshRotation(FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw) +
-		                                          (ViewRelativeYawAngle >= 0.0f
-			                                           ? -ViewRelativeYawAngleThreshold
-			                                           : ViewRelativeYawAngleThreshold)),
+		RefreshRotation(FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw +
+			                (ViewRelativeYawAngle >= 0.0f ? -ViewRelativeYawAngleThreshold : ViewRelativeYawAngleThreshold))),
 		                DeltaTime, RotationInterpolationSpeed);
 	}
 	else
@@ -1496,9 +1514,9 @@ void AAlsCharacter::RefreshInAirRotation(const float DeltaTime)
 				break;
 
 			case EAlsInAirRotationMode::KeepRelativeRotation:
-				RefreshRotation(
-					FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw) - LocomotionState.ViewRelativeTargetYawAngle),
-					DeltaTime, RotationInterpolationSpeed);
+				RefreshRotation(FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
+					                ViewState.Rotation.Yaw - LocomotionState.ViewRelativeTargetYawAngle)),
+				                DeltaTime, RotationInterpolationSpeed);
 				break;
 
 			default:
@@ -1533,7 +1551,7 @@ void AAlsCharacter::RefreshRotation(const float TargetYawAngle, const float Delt
 	RefreshTargetYawAngle(TargetYawAngle);
 
 	auto NewRotation{GetActorRotation()};
-	NewRotation.Yaw = UAlsMath::ExponentialDecayAngle(UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(NewRotation.Yaw)),
+	NewRotation.Yaw = UAlsMath::ExponentialDecayAngle(UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(NewRotation.Yaw)),
 	                                                  TargetYawAngle, DeltaTime, RotationInterpolationSpeed);
 
 	SetActorRotation(NewRotation);
@@ -1554,7 +1572,7 @@ void AAlsCharacter::RefreshRotationExtraSmooth(const float TargetYawAngle, const
 	                                                                          DeltaTime, TargetYawAngleRotationSpeed);
 
 	auto NewRotation{GetActorRotation()};
-	NewRotation.Yaw = UAlsMath::ExponentialDecayAngle(UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(NewRotation.Yaw)),
+	NewRotation.Yaw = UAlsMath::ExponentialDecayAngle(UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(NewRotation.Yaw)),
 	                                                  LocomotionState.SmoothTargetYawAngle, DeltaTime, RotationInterpolationSpeed);
 
 	SetActorRotation(NewRotation);
@@ -1590,6 +1608,6 @@ void AAlsCharacter::RefreshTargetYawAngle(const float TargetYawAngle)
 
 void AAlsCharacter::RefreshViewRelativeTargetYawAngle()
 {
-	LocomotionState.ViewRelativeTargetYawAngle =
-		FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw) - LocomotionState.TargetYawAngle);
+	LocomotionState.ViewRelativeTargetYawAngle = FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
+		ViewState.Rotation.Yaw - LocomotionState.TargetYawAngle));
 }

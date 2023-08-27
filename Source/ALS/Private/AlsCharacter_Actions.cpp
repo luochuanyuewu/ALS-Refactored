@@ -2,9 +2,13 @@
 
 #include "AlsAnimationInstance.h"
 #include "AlsCharacterMovementComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Curves/CurveFloat.h"
 #include "Curves/CurveVector.h"
 #include "Engine/NetConnection.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "RootMotionSources/AlsRootMotionSource_Mantling.h"
 #include "Settings/AlsCharacterSettings.h"
 #include "Utility/AlsConstants.h"
@@ -17,14 +21,13 @@ void AAlsCharacter::TryStartRolling(const float PlayRate)
 	{
 		StartRolling(PlayRate, Settings->Rolling.bRotateToInputOnStart && LocomotionState.bHasInput
 			                       ? LocomotionState.InputYawAngle
-			                       : UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(GetActorRotation().Yaw)));
+			                       : UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(GetActorRotation().Yaw)));
 	}
 }
 
 bool AAlsCharacter::IsRollingAllowedToStart(const UAnimMontage* Montage) const
 {
 	return !LocomotionAction.IsValid() ||
-	       // ReSharper disable once CppRedundantParentheses
 	       (LocomotionAction == AlsLocomotionActionTags::Rolling &&
 	        !GetMesh()->GetAnimInstance()->Montage_IsPlaying(Montage));
 }
@@ -43,7 +46,7 @@ void AAlsCharacter::StartRolling(const float PlayRate, const float TargetYawAngl
 		return;
 	}
 
-	const auto StartYawAngle{UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(GetActorRotation().Yaw))};
+	const auto StartYawAngle{UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(GetActorRotation().Yaw))};
 
 	if (GetLocalRole() >= ROLE_Authority)
 	{
@@ -104,6 +107,7 @@ void AAlsCharacter::RefreshRolling(const float DeltaTime)
 	}
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 void AAlsCharacter::RefreshRollingPhysics(const float DeltaTime)
 {
 	if (LocomotionAction != AlsLocomotionActionTags::Rolling)
@@ -121,7 +125,7 @@ void AAlsCharacter::RefreshRollingPhysics(const float DeltaTime)
 	}
 	else
 	{
-		TargetRotation.Yaw = UAlsMath::ExponentialDecayAngle(UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(TargetRotation.Yaw)),
+		TargetRotation.Yaw = UAlsMath::ExponentialDecayAngle(UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(TargetRotation.Yaw)),
 		                                                     RollingState.TargetYawAngle, DeltaTime,
 		                                                     Settings->Rolling.RotationInterpolationSpeed);
 
@@ -154,7 +158,7 @@ bool AAlsCharacter::TryStartMantling(const FAlsMantlingTraceSettings& TraceSetti
 	}
 
 	const auto ActorLocation{GetActorLocation()};
-	const auto ActorYawAngle{UE_REAL_TO_FLOAT(FRotator3d::NormalizeAxis(GetActorRotation().Yaw))};
+	const auto ActorYawAngle{UE_REAL_TO_FLOAT(FRotator::NormalizeAxis(GetActorRotation().Yaw))};
 
 	float ForwardTraceAngle;
 	if (LocomotionState.bHasSpeed)
@@ -182,7 +186,7 @@ bool AAlsCharacter::TryStartMantling(const FAlsMantlingTraceSettings& TraceSetti
 	};
 
 #if ENABLE_DRAW_DEBUG
-	const auto bDisplayDebug{UAlsUtility::ShouldDisplayDebugForActor(this, UAlsConstants::MantlingDisplayName())};
+	const auto bDisplayDebug{UAlsUtility::ShouldDisplayDebugForActor(this, UAlsConstants::MantlingDebugDisplayName())};
 #endif
 
 	const auto* Capsule{GetCapsuleComponent()};
@@ -507,7 +511,6 @@ void AAlsCharacter::RefreshMantling()
 	if (!RootMotionSource.IsValid() ||
 	    RootMotionSource->Status.HasFlag(ERootMotionSourceStatusFlags::Finished) ||
 	    RootMotionSource->Status.HasFlag(ERootMotionSourceStatusFlags::MarkedForRemoval) ||
-	    // ReSharper disable once CppRedundantParentheses
 	    (LocomotionAction.IsValid() && LocomotionAction != AlsLocomotionActionTags::Mantling) ||
 	    GetCharacterMovement()->MovementMode != MOVE_Custom)
 	{
@@ -592,6 +595,13 @@ void AAlsCharacter::StartRagdollingImplementation()
 		return;
 	}
 
+	GetMesh()->bUpdateJointsFromAnimation = true; // Required for the flail animation to work properly.
+
+	if (!GetMesh()->IsRunningParallelEvaluation() && GetMesh()->GetBoneSpaceTransforms().Num() > 0)
+	{
+		GetMesh()->UpdateRBJointMotors();
+	}
+
 	if (!IsNetMode(NM_Client))
 	{
 		// This is necessary to keep the animation instance ticking on the server during ragdolling.
@@ -625,20 +635,24 @@ void AAlsCharacter::StartRagdollingImplementation()
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	GetMesh()->SetAllBodiesBelowSimulatePhysics(UAlsConstants::PelvisBoneName(), true, true);
 
-	// Limit ragdoll speed to a few frames, because for some unclear reason,
-	// it can get a much higher initial speed than the character's last speed.
-
-	// TODO Find a better solution or wait for a fix in future engine versions.
-
-	static constexpr auto MinSpeedLimit{200.0f};
-
-	RagdollingState.SpeedLimitFrameTimeRemaining = 8;
-	RagdollingState.SpeedLimit = FMath::Max(LocomotionState.Velocity.Size(), MinSpeedLimit);
-
-	GetMesh()->ForEachBodyBelow(UAlsConstants::PelvisBoneName(), true, false, [SpeedLimit = RagdollingState.SpeedLimit](FBodyInstance* Body)
+	if (Settings->Ragdolling.bLimitInitialRagdollSpeed)
 	{
-		Body->SetLinearVelocity(Body->GetUnrealWorldVelocity().GetClampedToMaxSize(SpeedLimit), false);
-	});
+		// Limit the ragdoll's speed for a few frames, because for some unclear reason,
+		// it can get a much higher initial speed than the character's last speed.
+
+		// TODO Find a better solution or wait for a fix in future engine versions.
+
+		static constexpr auto MinSpeedLimit{200.0f};
+
+		RagdollingState.SpeedLimitFrameTimeRemaining = 8;
+		RagdollingState.SpeedLimit = FMath::Max(LocomotionState.Velocity.Size(), MinSpeedLimit);
+
+		GetMesh()->ForEachBodyBelow(UAlsConstants::PelvisBoneName(), true, false,
+		                            [SpeedLimit = RagdollingState.SpeedLimit](FBodyInstance* Body)
+		                            {
+			                            Body->SetLinearVelocity(Body->GetUnrealWorldVelocity().GetClampedToMaxSize(SpeedLimit), false);
+		                            });
+	}
 
 	RagdollingState.PullForce = 0.0f;
 	RagdollingState.bPendingFinalization = false;
@@ -663,7 +677,7 @@ void AAlsCharacter::SetRagdollTargetLocation(const FVector& NewTargetLocation)
 
 		if (GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetRagdollTargetLocation(NewTargetLocation);
+			ServerSetRagdollTargetLocation(RagdollTargetLocation);
 		}
 	}
 }
@@ -706,7 +720,7 @@ void AAlsCharacter::RefreshRagdolling(const float DeltaTime)
 	static constexpr auto Stiffness{25000.0f};
 
 	GetMesh()->SetAllMotorsAngularDriveParams(UAlsMath::Clamp01(UE_REAL_TO_FLOAT(
-		                                          RagdollingState.RootBoneVelocity.Size()) / ReferenceSpeed) * Stiffness,
+		                                          RagdollingState.RootBoneVelocity.Size() / ReferenceSpeed)) * Stiffness,
 	                                          0.0f, 0.0f, false);
 
 	RefreshRagdollingActorTransform(DeltaTime);
@@ -846,6 +860,8 @@ void AAlsCharacter::StopRagdollingImplementation()
 		GetMesh()->bOnlyAllowAutonomousTickPose = GetRemoteRole() == ROLE_AutonomousProxy &&
 		                                          IsValid(GetNetConnection()) && IsPawnControlled();
 	}
+
+	GetMesh()->bUpdateJointsFromAnimation = false;
 
 	SetLocomotionAction(FGameplayTag::EmptyTag);
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "GameFramework/Character.h"
-#include "Settings/AlsMantlingSettings.h"
 #include "State/AlsLocomotionState.h"
 #include "State/AlsMovementBaseState.h"
 #include "State/AlsRagdollingState.h"
@@ -10,10 +9,13 @@
 #include "Utility/AlsGameplayTags.h"
 #include "AlsCharacter.generated.h"
 
+struct FAlsMantlingParameters;
+struct FAlsMantlingTraceSettings;
 class UAlsCharacterMovementComponent;
 class UAlsCharacterSettings;
 class UAlsMovementSettings;
 class UAlsAnimationInstance;
+class UAlsMantlingSettings;
 
 UCLASS(AutoExpandCategories = ("Settings|Als Character", "Settings|Als Character|Desired State", "State|Als Character"))
 class ALS_API AAlsCharacter : public ACharacter
@@ -81,6 +83,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient, Replicated)
 	FVector_NetQuantizeNormal InputDirection;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character",
+		Transient, Replicated, Meta = (ClampMin = -180, ClampMax = 180, ForceUnits = "deg"))
+	float DesiredVelocityYawAngle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
 	FAlsLocomotionState LocomotionState;
@@ -153,9 +159,10 @@ public:
 public:
 	const FGameplayTag& GetLocomotionMode() const;
 
-private:
+protected:
 	void SetLocomotionMode(const FGameplayTag& NewLocomotionMode);
 
+private:
 	void NotifyLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
 
 protected:
@@ -198,10 +205,9 @@ private:
 public:
 	const FGameplayTag& GetRotationMode() const;
 
-private:
+protected:
 	void SetRotationMode(const FGameplayTag& NewRotationMode);
 
-protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnRotationModeChanged(const FGameplayTag& PreviousRotationMode);
 
@@ -234,10 +240,9 @@ public:
 public:
 	const FGameplayTag& GetStance() const;
 
-private:
+protected:
 	void SetStance(const FGameplayTag& NewStance);
 
-protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnStanceChanged(const FGameplayTag& PreviousStance);
 
@@ -258,10 +263,9 @@ private:
 public:
 	const FGameplayTag& GetGait() const;
 
-private:
+protected:
 	void SetGait(const FGameplayTag& NewGait);
 
-protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnGaitChanged(const FGameplayTag& PreviousGait);
 
@@ -300,11 +304,22 @@ public:
 
 	void SetLocomotionAction(const FGameplayTag& NewLocomotionAction);
 
+private:
 	void NotifyLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
+
+	// Input
+
+public:
+	const FVector& GetInputDirection() const;
+
+protected:
+	void SetInputDirection(FVector NewInputDirection);
+
+	virtual void RefreshInput(float DeltaTime);
 
 	// View
 
@@ -334,12 +349,10 @@ private:
 	// Locomotion
 
 public:
-	const FVector& GetInputDirection() const;
-
 	const FAlsLocomotionState& GetLocomotionState() const;
 
 private:
-	void SetInputDirection(FVector NewInputDirection);
+	void SetDesiredVelocityYawAngle(float NewDesiredVelocityYawAngle);
 
 	void RefreshLocomotionLocationAndRotation();
 
@@ -438,7 +451,7 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	bool IsMantlingAllowedToStart() const;
 
-	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
+	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (ReturnDisplayName = "Success"))
 	bool TryStartMantlingGrounded();
 
 private:
@@ -494,7 +507,7 @@ protected:
 public:
 	bool IsRagdollingAllowedToStop() const;
 
-	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
+	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (ReturnDisplayName = "Success"))
 	bool TryStopRagdolling();
 
 private:

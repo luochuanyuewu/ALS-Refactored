@@ -1,7 +1,10 @@
 #include "Utility/AlsUtility.h"
 
+#include "DrawDebugHelpers.h"
 #include "GameplayTagsManager.h"
 #include "Animation/AnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/PlayerState.h"
@@ -42,6 +45,35 @@ float UAlsUtility::GetFirstPlayerPingSeconds(const UObject* WorldContext)
 	const auto* PlayerState{IsValid(PlayerController) ? PlayerController->PlayerState.Get() : nullptr};
 
 	return IsValid(PlayerState) ? PlayerState->GetPingInMilliseconds() * 0.001f : 0.0f;
+}
+
+bool UAlsUtility::TryGetMovementBaseRotationSpeed(const FBasedMovementInfo& BasedMovement, FRotator& RotationSpeed)
+{
+	if (!MovementBaseUtility::IsDynamicBase(BasedMovement.MovementBase))
+	{
+		RotationSpeed = FRotator::ZeroRotator;
+		return false;
+	}
+
+	const auto* BodyInstance{BasedMovement.MovementBase->GetBodyInstance(BasedMovement.BoneName)};
+	if (BodyInstance == nullptr)
+	{
+		RotationSpeed = FRotator::ZeroRotator;
+		return false;
+	}
+
+	const auto AngularVelocityVector{BodyInstance->GetUnrealWorldAngularVelocityInRadians()};
+	if (AngularVelocityVector.IsNearlyZero())
+	{
+		RotationSpeed = FRotator::ZeroRotator;
+		return false;
+	}
+
+	RotationSpeed.Roll = FMath::RadiansToDegrees(AngularVelocityVector.X);
+	RotationSpeed.Pitch = FMath::RadiansToDegrees(AngularVelocityVector.Y);
+	RotationSpeed.Yaw = FMath::RadiansToDegrees(AngularVelocityVector.Z);
+
+	return true;
 }
 
 bool UAlsUtility::ShouldDisplayDebugForActor(const AActor* Actor, const FName& DisplayName)

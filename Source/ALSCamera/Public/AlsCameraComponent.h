@@ -7,9 +7,9 @@
 class UAlsCameraSettings;
 class ACharacter;
 
-UCLASS(ClassGroup=Als,meta=(BlueprintSpawnableComponent),HideCategories = ("ComponentTick", "Clothing", "Physics", "MasterPoseComponent", "Collision",
-	"AnimationRig", "Lighting", "Deformer", "Rendering", "HLOD", "Navigation", "VirtualTexture", "SkeletalMesh",
-	"LeaderPoseComponent", "Optimization", "LOD", "MaterialParameters", "TextureStreaming", "Mobile", "RayTracing"))
+UCLASS(HideCategories = ("ComponentTick", "Clothing", "Physics", "MasterPoseComponent", "Collision", "AnimationRig",
+						 "Lighting", "Deformer", "Rendering", "PathTracing", "HLOD", "Navigation", "VirtualTexture", "SkeletalMesh",
+						 "LeaderPoseComponent", "Optimization", "LOD", "MaterialParameters", "TextureStreaming", "Mobile", "RayTracing"))
 class ALSCAMERA_API UAlsCameraComponent : public USkeletalMeshComponent
 {
 	GENERATED_BODY()
@@ -70,9 +70,11 @@ public:
 	UAlsCameraComponent();
 
 	UFUNCTION(BlueprintPure, Category = "ALS| Als Camera")
-	static UAlsCameraComponent* FindAlsCameraComponent(const AActor* Actor);
+	static UAlsCameraComponent *FindAlsCameraComponent(const AActor *Actor);
 
 	virtual void OnRegister() override;
+
+	virtual void RegisterComponentTickFunctions(bool bRegister) override;
 
 	virtual void Activate(bool bReset) override;
 
@@ -80,7 +82,7 @@ public:
 
 	virtual void BeginPlay() override;
 
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 
 	virtual void CompleteParallelAnimationEvaluation(bool bDoPostAnimationEvaluation) override;
 
@@ -94,50 +96,50 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Camera")
 	void SetRightShoulder(bool bNewRightShoulder);
 
-	UFUNCTION(BlueprintPure, Category = "ALS|Als Camera")
+	UFUNCTION(BlueprintPure, Category = "ALS|Als Camera", Meta = (ReturnDisplayName = "Camera Location"))
 	FVector GetFirstPersonCameraLocation() const;
 
-	UFUNCTION(BlueprintPure, Category = "ALS|Als Camera")
-	FTransform GetThirdPersonPivotTransform() const;
+	UFUNCTION(BlueprintPure, Category = "ALS|Als Camera", Meta = (ReturnDisplayName = "Pivot Location"))
+	FVector GetThirdPersonPivotLocation() const;
 
-	UFUNCTION(BlueprintPure, Category = "ALS|Als Camera")
+	UFUNCTION(BlueprintPure, Category = "ALS|Als Camera", Meta = (ReturnDisplayName = "Trace Start"))
 	FVector GetThirdPersonTraceStartLocation() const;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Als Camera")
-	void GetViewInfo(FMinimalViewInfo& ViewInfo) const;
+	void GetViewInfo(FMinimalViewInfo &ViewInfo) const;
 
 private:
 	void TickCamera(float DeltaTime, bool bAllowLag = true);
 
-	FRotator CalculateCameraRotation(const FRotator& CameraTargetRotation, float DeltaTime, bool bAllowLag) const;
+	FRotator CalculateCameraRotation(const FRotator &CameraTargetRotation, float DeltaTime, bool bAllowLag) const;
 
-	FVector CalculatePivotLagLocation(const FQuat& CameraYawRotation, float DeltaTime, bool bAllowLag) const;
+	FVector CalculatePivotLagLocation(const FQuat &CameraYawRotation, float DeltaTime, bool bAllowLag) const;
 
-	FVector CalculatePivotOffset(const FQuat& PivotTargetRotation) const;
+	FVector CalculatePivotOffset() const;
 
 	FVector CalculateCameraOffset() const;
 
-	FVector CalculateCameraTrace(const FVector& CameraTargetLocation, const FVector& PivotOffset,
-	                             float DeltaTime, bool bAllowLag, float& NewTraceDistanceRatio) const;
+	FVector CalculateCameraTrace(const FVector &CameraTargetLocation, const FVector &PivotOffset,
+								 float DeltaTime, bool bAllowLag, float &NewTraceDistanceRatio) const;
 
-	bool TryAdjustLocationBlockedByGeometry(FVector& Location, bool bDisplayDebugCameraTraces) const;
+	bool TryAdjustLocationBlockedByGeometry(FVector &Location, bool bDisplayDebugCameraTraces) const;
 
 	// Debug
 
 public:
-	static void OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
-	
-	void DisplayDebug(const UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& VerticalLocation) const;
+	static void OnShowDebugInfo(AHUD *HUD, UCanvas *Canvas, const FDebugDisplayInfo &DisplayInfo, float &YL, float &YPos);
+
+	void DisplayDebug(const UCanvas *Canvas, const FDebugDisplayInfo &DisplayInfo, float &VerticalLocation) const;
 
 private:
-	static void DisplayDebugHeader(const UCanvas* Canvas, const FText& HeaderText, const FLinearColor& HeaderColor,
-	                               float Scale, float HorizontalLocation, float& VerticalLocation);
+	static void DisplayDebugHeader(const UCanvas *Canvas, const FText &HeaderText, const FLinearColor &HeaderColor,
+								   float Scale, float HorizontalLocation, float &VerticalLocation);
 
-	void DisplayDebugCurves(const UCanvas* Canvas, float Scale, float HorizontalLocation, float& VerticalLocation) const;
+	void DisplayDebugCurves(const UCanvas *Canvas, float Scale, float HorizontalLocation, float &VerticalLocation) const;
 
-	void DisplayDebugShapes(const UCanvas* Canvas, float Scale, float HorizontalLocation, float& VerticalLocation) const;
+	void DisplayDebugShapes(const UCanvas *Canvas, float Scale, float HorizontalLocation, float &VerticalLocation) const;
 
-	void DisplayDebugTraces(const UCanvas* Canvas, float Scale, float HorizontalLocation, float& VerticalLocation) const;
+	void DisplayDebugTraces(const UCanvas *Canvas, float Scale, float HorizontalLocation, float &VerticalLocation) const;
 };
 
 inline float UAlsCameraComponent::GetPostProcessWeight() const

@@ -4,8 +4,10 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Curves/CurveVector.h"
+#include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "Utility/AlsMacros.h"
+#include "Utility/AlsUtility.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsCharacterMovementComponent)
 
@@ -119,6 +121,8 @@ UAlsCharacterMovementComponent::UAlsCharacterMovementComponent()
 {
 	SetNetworkMoveDataContainer(MoveDataContainer);
 
+	bTickBeforeOwner = true;
+
 	// NetworkMaxSmoothUpdateDistance = 92.0f;
 	// NetworkNoSmoothUpdateDistance = 140.0f;
 
@@ -133,6 +137,12 @@ UAlsCharacterMovementComponent::UAlsCharacterMovementComponent()
 	MaxWalkSpeedCrouched = 200.0f;
 	MinAnalogWalkSpeed = 25.0f;
 	bCanWalkOffLedgesWhenCrouching = true;
+
+	// bImpartBaseVelocityX = false;
+	// bImpartBaseVelocityY = false;
+	// bImpartBaseVelocityZ = false;
+	// bImpartBaseAngularVelocity = false;
+
 	bIgnoreBaseRotation = true;
 
 	PerchRadiusThreshold = 20.0f;
@@ -219,6 +229,19 @@ void UAlsCharacterMovementComponent::UpdateBasedRotation(FRotator& FinalRotation
 
 		CharacterOwner->Controller->SetControlRotation(NewControlRotation);
 	}
+}
+
+void UAlsCharacterMovementComponent::CalcVelocity(const float DeltaTime, const float Friction,
+                                                  const bool bFluid, const float BrakingDeceleration)
+{
+	FRotator BaseRotationSpeed;
+	if (!bIgnoreBaseRotation && UAlsUtility::TryGetMovementBaseRotationSpeed(CharacterOwner->GetBasedMovement(), BaseRotationSpeed))
+	{
+		// Offset the velocity to keep it relative to the movement base.
+		Velocity = (BaseRotationSpeed * DeltaTime).RotateVector(Velocity);
+	}
+
+	Super::CalcVelocity(DeltaTime, Friction, bFluid, BrakingDeceleration);
 }
 
 float UAlsCharacterMovementComponent::GetMaxAcceleration() const
@@ -432,7 +455,11 @@ void UAlsCharacterMovementComponent::PhysWalking(const float DeltaTime, int32 It
 					HandleWalkingOffLedge(OldFloor.HitResult.ImpactNormal, OldFloor.HitResult.Normal, OldLocation, timeTick);
 					if (IsMovingOnGround())
 					{
+						// TODO Start of custom ALS code block.
+
 						ApplyPendingPenetrationAdjustment();
+
+						// TODO End of custom ALS code block.
 
 						// If still walking, then fall. If not, assume the user set a different mode they want to keep.
 						StartFalling(Iterations, remainingTime, timeTick, Delta, OldLocation);
@@ -440,7 +467,11 @@ void UAlsCharacterMovementComponent::PhysWalking(const float DeltaTime, int32 It
 					return;
 				}
 
+				// TODO Start of custom ALS code block.
+
 				ApplyPendingPenetrationAdjustment();
+
+				// TODO End of custom ALS code block.
 
 				AdjustFloorHeight();
 				SetBase(CurrentFloor.HitResult.Component.Get(), CurrentFloor.HitResult.BoneName);
@@ -482,6 +513,13 @@ void UAlsCharacterMovementComponent::PhysWalking(const float DeltaTime, int32 It
 			// Make velocity reflect actual move
 			if( !bJustTeleported && !HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity() && timeTick >= MIN_TICK_TIME)
 			{
+				// TODO Start of custom ALS code block.
+
+				PrePenetrationAdjustmentVelocity = MoveVelocity;
+				bPrePenetrationAdjustmentVelocityValid = true;
+
+				// TODO End of custom ALS code block.
+
 				// TODO-RootMotionSource: Allow this to happen during partial override Velocity, but only set allowed axes?
 				Velocity = (UpdatedComponent->GetComponentLocation() - OldLocation) / timeTick;
 				MaintainHorizontalGroundVelocity();
@@ -539,6 +577,177 @@ void UAlsCharacterMovementComponent::PhysCustom(const float DeltaTime, int32 Ite
 	MoveUpdatedComponent(Velocity * DeltaTime, UpdatedComponent->GetComponentQuat(), false);
 
 	Super::PhysCustom(DeltaTime, Iterations);
+}
+
+FVector UAlsCharacterMovementComponent::ConsumeInputVector()
+{
+	auto InputVector{Super::ConsumeInputVector()};
+
+	FRotator BaseRotationSpeed;
+	if (!bIgnoreBaseRotation && UAlsUtility::TryGetMovementBaseRotationSpeed(CharacterOwner->GetBasedMovement(), BaseRotationSpeed))
+	{
+		// Offset the input vector to keep it relative to the movement base.
+		InputVector = (BaseRotationSpeed * GetWorld()->GetDeltaSeconds()).RotateVector(InputVector);
+	}
+
+	return InputVector;
+}
+
+void UAlsCharacterMovementComponent::ComputeFloorDist(const FVector& CapsuleLocation, float LineDistance, float SweepDistance,
+                                                      FFindFloorResult& OutFloorResult, float SweepRadius,
+                                                      const FHitResult* DownwardSweepResult) const
+{
+	// TODO Copied with modifications from UCharacterMovementComponent::ComputeFloorDist().
+	// TODO After the release of a new engine version, this code should be updated to match the source code.
+
+	// ReSharper disable All
+
+	// UE_LOG(LogCharacterMovement, VeryVerbose, TEXT("[Role:%d] ComputeFloorDist: %s at location %s"), (int32)CharacterOwner->GetLocalRole(), *GetNameSafe(CharacterOwner), *CapsuleLocation.ToString());
+	OutFloorResult.Clear();
+
+	float PawnRadius, PawnHalfHeight;
+	CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleSize(PawnRadius, PawnHalfHeight);
+
+	bool bSkipSweep = false;
+	if (DownwardSweepResult != NULL && DownwardSweepResult->IsValidBlockingHit())
+	{
+		// Only if the supplied sweep was vertical and downward.
+		if ((DownwardSweepResult->TraceStart.Z > DownwardSweepResult->TraceEnd.Z) &&
+			(DownwardSweepResult->TraceStart - DownwardSweepResult->TraceEnd).SizeSquared2D() <= UE_KINDA_SMALL_NUMBER)
+		{
+			// Reject hits that are barely on the cusp of the radius of the capsule
+			if (IsWithinEdgeTolerance(DownwardSweepResult->Location, DownwardSweepResult->ImpactPoint, PawnRadius))
+			{
+				// Don't try a redundant sweep, regardless of whether this sweep is usable.
+				bSkipSweep = true;
+
+				const bool bIsWalkable = IsWalkable(*DownwardSweepResult);
+				const float FloorDist = (CapsuleLocation.Z - DownwardSweepResult->Location.Z);
+				OutFloorResult.SetFromSweep(*DownwardSweepResult, FloorDist, bIsWalkable);
+
+				if (bIsWalkable)
+				{
+					// Use the supplied downward sweep as the floor hit result.
+					return;
+				}
+			}
+		}
+	}
+
+	// We require the sweep distance to be >= the line distance, otherwise the HitResult can't be interpreted as the sweep result.
+	if (SweepDistance < LineDistance)
+	{
+		ensure(SweepDistance >= LineDistance);
+		return;
+	}
+
+	bool bBlockingHit = false;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ComputeFloorDist), false, CharacterOwner);
+	FCollisionResponseParams ResponseParam;
+	InitCollisionParams(QueryParams, ResponseParam);
+	const ECollisionChannel CollisionChannel = UpdatedComponent->GetCollisionObjectType();
+
+	// Sweep test
+	if (!bSkipSweep && SweepDistance > 0.f && SweepRadius > 0.f)
+	{
+		// Use a shorter height to avoid sweeps giving weird results if we start on a surface.
+		// This also allows us to adjust out of penetrations.
+		const float ShrinkScale = 0.9f;
+		const float ShrinkScaleOverlap = 0.1f;
+		float ShrinkHeight = (PawnHalfHeight - PawnRadius) * (1.f - ShrinkScale);
+		float TraceDist = SweepDistance + ShrinkHeight;
+		FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(SweepRadius, PawnHalfHeight - ShrinkHeight);
+
+		FHitResult Hit(1.f);
+		bBlockingHit = FloorSweepTest(Hit, CapsuleLocation, CapsuleLocation + FVector(0.f,0.f,-TraceDist), CollisionChannel, CapsuleShape, QueryParams, ResponseParam);
+
+		// TODO Start of custom ALS code block.
+
+		const_cast<ThisClass*>(this)->SavePenetrationAdjustment(Hit);
+
+		// TODO End of custom ALS code block.
+
+		if (bBlockingHit)
+		{
+			// Reject hits adjacent to us, we only care about hits on the bottom portion of our capsule.
+			// Check 2D distance to impact point, reject if within a tolerance from radius.
+			if (Hit.bStartPenetrating || !IsWithinEdgeTolerance(CapsuleLocation, Hit.ImpactPoint, CapsuleShape.Capsule.Radius))
+			{
+				// Use a capsule with a slightly smaller radius and shorter height to avoid the adjacent object.
+				// Capsule must not be nearly zero or the trace will fall back to a line trace from the start point and have the wrong length.
+				CapsuleShape.Capsule.Radius = FMath::Max(0.f, CapsuleShape.Capsule.Radius - SWEEP_EDGE_REJECT_DISTANCE - UE_KINDA_SMALL_NUMBER);
+				if (!CapsuleShape.IsNearlyZero())
+				{
+					ShrinkHeight = (PawnHalfHeight - PawnRadius) * (1.f - ShrinkScaleOverlap);
+					TraceDist = SweepDistance + ShrinkHeight;
+					CapsuleShape.Capsule.HalfHeight = FMath::Max(PawnHalfHeight - ShrinkHeight, CapsuleShape.Capsule.Radius);
+					Hit.Reset(1.f, false);
+
+					bBlockingHit = FloorSweepTest(Hit, CapsuleLocation, CapsuleLocation + FVector(0.f,0.f,-TraceDist), CollisionChannel, CapsuleShape, QueryParams, ResponseParam);
+				}
+			}
+
+			// Reduce hit distance by ShrinkHeight because we shrank the capsule for the trace.
+			// We allow negative distances here, because this allows us to pull out of penetrations.
+			const float MaxPenetrationAdjust = FMath::Max(MAX_FLOOR_DIST, PawnRadius);
+			const float SweepResult = FMath::Max(-MaxPenetrationAdjust, Hit.Time * TraceDist - ShrinkHeight);
+
+			OutFloorResult.SetFromSweep(Hit, SweepResult, false);
+			if (Hit.IsValidBlockingHit() && IsWalkable(Hit))
+			{
+				if (SweepResult <= SweepDistance)
+				{
+					// Hit within test distance.
+					OutFloorResult.bWalkableFloor = true;
+					return;
+				}
+			}
+		}
+	}
+
+	// Since we require a longer sweep than line trace, we don't want to run the line trace if the sweep missed everything.
+	// We do however want to try a line trace if the sweep was stuck in penetration.
+	if (!OutFloorResult.bBlockingHit && !OutFloorResult.HitResult.bStartPenetrating)
+	{
+		OutFloorResult.FloorDist = SweepDistance;
+		return;
+	}
+
+	// Line trace
+	if (LineDistance > 0.f)
+	{
+		const float ShrinkHeight = PawnHalfHeight;
+		const FVector LineTraceStart = CapsuleLocation;
+		const float TraceDist = LineDistance + ShrinkHeight;
+		const FVector Down = FVector(0.f, 0.f, -TraceDist);
+		QueryParams.TraceTag = SCENE_QUERY_STAT_NAME_ONLY(FloorLineTrace);
+
+		FHitResult Hit(1.f);
+		bBlockingHit = GetWorld()->LineTraceSingleByChannel(Hit, LineTraceStart, LineTraceStart + Down, CollisionChannel, QueryParams, ResponseParam);
+
+		if (bBlockingHit)
+		{
+			if (Hit.Time > 0.f)
+			{
+				// Reduce hit distance by ShrinkHeight because we started the trace higher than the base.
+				// We allow negative distances here, because this allows us to pull out of penetrations.
+				const float MaxPenetrationAdjust = FMath::Max(MAX_FLOOR_DIST, PawnRadius);
+				const float LineResult = FMath::Max(-MaxPenetrationAdjust, Hit.Time * TraceDist - ShrinkHeight);
+
+				OutFloorResult.bBlockingHit = true;
+				if (LineResult <= LineDistance && IsWalkable(Hit))
+				{
+					OutFloorResult.SetFromLineTrace(Hit, OutFloorResult.FloorDist, LineResult, true);
+					return;
+				}
+			}
+		}
+	}
+
+	// No hits were acceptable.
+	OutFloorResult.bWalkableFloor = false;
+
+	// ReSharper restore All
 }
 
 void UAlsCharacterMovementComponent::PerformMovement(const float DeltaTime)
@@ -628,159 +837,6 @@ void UAlsCharacterMovementComponent::MoveAutonomous(const float ClientTimeStamp,
 
 		PreviousControlRotation = NewControlRotation;
 	}
-}
-
-void UAlsCharacterMovementComponent::ComputeFloorDist(const FVector& CapsuleLocation, float LineDistance, float SweepDistance,
-                                                      FFindFloorResult& OutFloorResult, float SweepRadius,
-                                                      const FHitResult* DownwardSweepResult) const
-{
-	// TODO Copied with modifications from UCharacterMovementComponent::ComputeFloorDist().
-	// TODO After the release of a new engine version, this code should be updated to match the source code.
-
-	// ReSharper disable All
-
-	// UE_LOG(LogCharacterMovement, VeryVerbose, TEXT("[Role:%d] ComputeFloorDist: %s at location %s"), (int32)CharacterOwner->GetLocalRole(), *GetNameSafe(CharacterOwner), *CapsuleLocation.ToString());
-	OutFloorResult.Clear();
-
-	float PawnRadius, PawnHalfHeight;
-	CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleSize(PawnRadius, PawnHalfHeight);
-
-	bool bSkipSweep = false;
-	if (DownwardSweepResult != NULL && DownwardSweepResult->IsValidBlockingHit())
-	{
-		// Only if the supplied sweep was vertical and downward.
-		if ((DownwardSweepResult->TraceStart.Z > DownwardSweepResult->TraceEnd.Z) &&
-			(DownwardSweepResult->TraceStart - DownwardSweepResult->TraceEnd).SizeSquared2D() <= UE_KINDA_SMALL_NUMBER)
-		{
-			// Reject hits that are barely on the cusp of the radius of the capsule
-			if (IsWithinEdgeTolerance(DownwardSweepResult->Location, DownwardSweepResult->ImpactPoint, PawnRadius))
-			{
-				// Don't try a redundant sweep, regardless of whether this sweep is usable.
-				bSkipSweep = true;
-
-				const bool bIsWalkable = IsWalkable(*DownwardSweepResult);
-				const float FloorDist = (CapsuleLocation.Z - DownwardSweepResult->Location.Z);
-				OutFloorResult.SetFromSweep(*DownwardSweepResult, FloorDist, bIsWalkable);
-
-				if (bIsWalkable)
-				{
-					// Use the supplied downward sweep as the floor hit result.
-					return;
-				}
-			}
-		}
-	}
-
-	// We require the sweep distance to be >= the line distance, otherwise the HitResult can't be interpreted as the sweep result.
-	if (SweepDistance < LineDistance)
-	{
-		ensure(SweepDistance >= LineDistance);
-		return;
-	}
-
-	bool bBlockingHit = false;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ComputeFloorDist), false, CharacterOwner);
-	FCollisionResponseParams ResponseParam;
-	InitCollisionParams(QueryParams, ResponseParam);
-	const ECollisionChannel CollisionChannel = UpdatedComponent->GetCollisionObjectType();
-
-	// Sweep test
-	if (!bSkipSweep && SweepDistance > 0.f && SweepRadius > 0.f)
-	{
-		// Use a shorter height to avoid sweeps giving weird results if we start on a surface.
-		// This also allows us to adjust out of penetrations.
-		const float ShrinkScale = 0.9f;
-		const float ShrinkScaleOverlap = 0.1f;
-		float ShrinkHeight = (PawnHalfHeight - PawnRadius) * (1.f - ShrinkScale);
-		float TraceDist = SweepDistance + ShrinkHeight;
-		FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(SweepRadius, PawnHalfHeight - ShrinkHeight);
-
-		FHitResult Hit(1.f);
-		bBlockingHit = FloorSweepTest(Hit, CapsuleLocation, CapsuleLocation + FVector(0.f,0.f,-TraceDist), CollisionChannel, CapsuleShape, QueryParams, ResponseParam);
-
-		const_cast<ThisClass*>(this)->SavePenetrationAdjustment(Hit);
-
-		if (bBlockingHit)
-		{
-			// Reject hits adjacent to us, we only care about hits on the bottom portion of our capsule.
-			// Check 2D distance to impact point, reject if within a tolerance from radius.
-			if (Hit.bStartPenetrating || !IsWithinEdgeTolerance(CapsuleLocation, Hit.ImpactPoint, CapsuleShape.Capsule.Radius))
-			{
-				// Use a capsule with a slightly smaller radius and shorter height to avoid the adjacent object.
-				// Capsule must not be nearly zero or the trace will fall back to a line trace from the start point and have the wrong length.
-				CapsuleShape.Capsule.Radius = FMath::Max(0.f, CapsuleShape.Capsule.Radius - SWEEP_EDGE_REJECT_DISTANCE - UE_KINDA_SMALL_NUMBER);
-				if (!CapsuleShape.IsNearlyZero())
-				{
-					ShrinkHeight = (PawnHalfHeight - PawnRadius) * (1.f - ShrinkScaleOverlap);
-					TraceDist = SweepDistance + ShrinkHeight;
-					CapsuleShape.Capsule.HalfHeight = FMath::Max(PawnHalfHeight - ShrinkHeight, CapsuleShape.Capsule.Radius);
-					Hit.Reset(1.f, false);
-
-					bBlockingHit = FloorSweepTest(Hit, CapsuleLocation, CapsuleLocation + FVector(0.f,0.f,-TraceDist), CollisionChannel, CapsuleShape, QueryParams, ResponseParam);
-				}
-			}
-
-			// Reduce hit distance by ShrinkHeight because we shrank the capsule for the trace.
-			// We allow negative distances here, because this allows us to pull out of penetrations.
-			const float MaxPenetrationAdjust = FMath::Max(MAX_FLOOR_DIST, PawnRadius);
-			const float SweepResult = FMath::Max(-MaxPenetrationAdjust, Hit.Time * TraceDist - ShrinkHeight);
-
-			OutFloorResult.SetFromSweep(Hit, SweepResult, false);
-			if (Hit.IsValidBlockingHit() && IsWalkable(Hit))
-			{
-				if (SweepResult <= SweepDistance)
-				{
-					// Hit within test distance.
-					OutFloorResult.bWalkableFloor = true;
-					return;
-				}
-			}
-		}
-	}
-
-	// Since we require a longer sweep than line trace, we don't want to run the line trace if the sweep missed everything.
-	// We do however want to try a line trace if the sweep was stuck in penetration.
-	if (!OutFloorResult.bBlockingHit && !OutFloorResult.HitResult.bStartPenetrating)
-	{
-		OutFloorResult.FloorDist = SweepDistance;
-		return;
-	}
-
-	// Line trace
-	if (LineDistance > 0.f)
-	{
-		const float ShrinkHeight = PawnHalfHeight;
-		const FVector LineTraceStart = CapsuleLocation;
-		const float TraceDist = LineDistance + ShrinkHeight;
-		const FVector Down = FVector(0.f, 0.f, -TraceDist);
-		QueryParams.TraceTag = SCENE_QUERY_STAT_NAME_ONLY(FloorLineTrace);
-
-		FHitResult Hit(1.f);
-		bBlockingHit = GetWorld()->LineTraceSingleByChannel(Hit, LineTraceStart, LineTraceStart + Down, CollisionChannel, QueryParams, ResponseParam);
-
-		if (bBlockingHit)
-		{
-			if (Hit.Time > 0.f)
-			{
-				// Reduce hit distance by ShrinkHeight because we started the trace higher than the base.
-				// We allow negative distances here, because this allows us to pull out of penetrations.
-				const float MaxPenetrationAdjust = FMath::Max(MAX_FLOOR_DIST, PawnRadius);
-				const float LineResult = FMath::Max(-MaxPenetrationAdjust, Hit.Time * TraceDist - ShrinkHeight);
-
-				OutFloorResult.bBlockingHit = true;
-				if (LineResult <= LineDistance && IsWalkable(Hit))
-				{
-					OutFloorResult.SetFromLineTrace(Hit, OutFloorResult.FloorDist, LineResult, true);
-					return;
-				}
-			}
-		}
-	}
-
-	// No hits were acceptable.
-	OutFloorResult.bWalkableFloor = false;
-
-	// ReSharper restore All
 }
 
 void UAlsCharacterMovementComponent::SavePenetrationAdjustment(const FHitResult& Hit)
@@ -892,4 +948,20 @@ float UAlsCharacterMovementComponent::CalculateGaitAmount() const
 void UAlsCharacterMovementComponent::SetMovementModeLocked(const bool bNewMovementModeLocked)
 {
 	bMovementModeLocked = bNewMovementModeLocked;
+}
+
+bool UAlsCharacterMovementComponent::TryConsumePrePenetrationAdjustmentVelocity(FVector& OutVelocity)
+{
+	if (!bPrePenetrationAdjustmentVelocityValid)
+	{
+		OutVelocity = FVector::ZeroVector;
+		return false;
+	}
+
+	OutVelocity = PrePenetrationAdjustmentVelocity;
+
+	PrePenetrationAdjustmentVelocity = FVector::ZeroVector;
+	bPrePenetrationAdjustmentVelocityValid = false;
+
+	return true;
 }
