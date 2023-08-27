@@ -2,8 +2,6 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AlsCharacterSettings)
 
-#include UE_INLINE_GENERATED_CPP_BY_NAME(AlsCharacterSettings)
-
 UAlsCharacterSettings::UAlsCharacterSettings()
 {
 	Ragdolling.GroundTraceObjectTypes =

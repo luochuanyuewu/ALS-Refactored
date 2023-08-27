@@ -8,9 +8,9 @@
 #include "GameFramework/GameNetworkManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "Settings/AlsCharacterSettings.h"
 #include "Utility/AlsConstants.h"
-#include "Utility/AlsLog.h"
 #include "Utility/AlsMacros.h"
 #include "Utility/AlsUtility.h"
 
@@ -25,7 +25,6 @@ UAlsComponent::UAlsComponent(const FObjectInitializer& ObjectInitializer) : Supe
 {
 	SetIsReplicatedByDefault(true);
 	PrimaryComponentTick.bCanEverTick = true;
-
 }
 
 void UAlsComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -45,13 +44,14 @@ void UAlsComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, ReplicatedViewRotation, Parameters)
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, InputDirection, Parameters)
+	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, DesiredVelocityYawAngle, Parameters)
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass, RagdollTargetLocation, Parameters)
 }
 
 void UAlsComponent::OnRegister()
 {
 	OwnerCharacter = Cast<ACharacter>(GetOwner());
-	
+
 	if (OwnerCharacter)
 		AlsCharacterMovement = Cast<UAlsCharacterMovementComponent>(OwnerCharacter->GetMovementComponent());
 	// Set some default values here to ensure that the animation instance and the
@@ -112,7 +112,7 @@ void UAlsComponent::BeginPlay()
 
 		AnimationInstance = Cast<UAlsAnimationInstance>(OwnerCharacter->GetMesh()->GetAnimInstance());
 	}
-	
+
 	ALS_ENSURE(IsValid(Settings));
 	ALS_ENSURE(IsValid(MovementSettings));
 	ALS_ENSURE(AnimationInstance.IsValid());
@@ -214,7 +214,7 @@ void UAlsComponent::OnRep_ReplicatedBasedMovement()
 		FQuat MovementBaseRotation;
 
 		MovementBaseUtility::GetMovementBaseTransform(OwnerCharacter->GetReplicatedBasedMovement().MovementBase, OwnerCharacter->GetReplicatedBasedMovement().BoneName,
-													  MovementBaseLocation, MovementBaseRotation);
+		                                              MovementBaseLocation, MovementBaseRotation);
 
 		//TODO 金生
 		// OwnerCharacter->ReplicatedBasedMovement.Rotation = (MovementBaseRotation.Inverse() * GetActorQuat()).Rotator();
@@ -252,13 +252,15 @@ void UAlsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 
 	if (!IsValid(Settings) || !AnimationInstance.IsValid())
 	{
-		Super::Tick(DeltaTime);
+		Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 		return;
 	}
 
 	RefreshVisibilityBasedAnimTickOption();
 
 	RefreshMovementBase();
+
+	RefreshInput(DeltaTime);
 
 	RefreshLocomotionEarly();
 
@@ -279,7 +281,7 @@ void UAlsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 	RefreshRagdolling(DeltaTime);
 	RefreshRolling(DeltaTime);
 
-	Super::Tick(DeltaTime);
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	RefreshLocomotionLate(DeltaTime);
 
@@ -293,6 +295,9 @@ void UAlsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 void UAlsComponent::PossessedBy(AController* NewController)
 {
 	// Super::PossessedBy(NewController);
+
+	RefreshUsingAbsoluteRotation();
+	RefreshVisibilityBasedAnimTickOption();
 
 	// Enable view network smoothing on the listen server here because the remote role may not be valid yet during begin play.
 
@@ -355,10 +360,10 @@ void UAlsComponent::RefreshVisibilityBasedAnimTickOption() const
 
 void UAlsComponent::RefreshMovementBase()
 {
-	if (BasedMovement.MovementBase != MovementBase.Primitive || BasedMovement.BoneName != MovementBase.BoneName)
+	if (OwnerCharacter->GetBasedMovement().MovementBase != MovementBase.Primitive || OwnerCharacter->GetBasedMovement().BoneName != MovementBase.BoneName)
 	{
-		MovementBase.Primitive = BasedMovement.MovementBase;
-		MovementBase.BoneName = BasedMovement.BoneName;
+		MovementBase.Primitive = OwnerCharacter->GetBasedMovement().MovementBase;
+		MovementBase.BoneName = OwnerCharacter->GetBasedMovement().BoneName;
 		MovementBase.bBaseChanged = true;
 	}
 	else
@@ -366,17 +371,17 @@ void UAlsComponent::RefreshMovementBase()
 		MovementBase.bBaseChanged = false;
 	}
 
-	MovementBase.bHasRelativeLocation = BasedMovement.HasRelativeLocation();
-	MovementBase.bHasRelativeRotation = MovementBase.bHasRelativeLocation && BasedMovement.bRelativeRotation;
+	MovementBase.bHasRelativeLocation = OwnerCharacter->GetBasedMovement().HasRelativeLocation();
+	MovementBase.bHasRelativeRotation = MovementBase.bHasRelativeLocation && OwnerCharacter->GetBasedMovement().bRelativeRotation;
 
 	const auto PreviousRotation{MovementBase.Rotation};
 
-	MovementBaseUtility::GetMovementBaseTransform(BasedMovement.MovementBase, BasedMovement.BoneName,
-												  MovementBase.Location, MovementBase.Rotation);
+	MovementBaseUtility::GetMovementBaseTransform(OwnerCharacter->GetBasedMovement().MovementBase, OwnerCharacter->GetBasedMovement().BoneName,
+	                                              MovementBase.Location, MovementBase.Rotation);
 
 	MovementBase.DeltaRotation = MovementBase.bHasRelativeLocation && !MovementBase.bBaseChanged
-									 ? (MovementBase.Rotation * PreviousRotation.Inverse()).Rotator()
-									 : FRotator::ZeroRotator;
+		                             ? (MovementBase.Rotation * PreviousRotation.Inverse()).Rotator()
+		                             : FRotator::ZeroRotator;
 }
 
 void UAlsComponent::SetViewMode(const FGameplayTag& NewViewMode)
@@ -399,18 +404,6 @@ void UAlsComponent::ServerSetViewMode_Implementation(const FGameplayTag& NewView
 	SetViewMode(NewViewMode);
 }
 
-void UAlsComponent::SetLocomotionMode(const FGameplayTag& NewLocomotionMode)
-{
-	if (LocomotionMode != NewLocomotionMode)
-	{
-		const auto PreviousLocomotionMode{LocomotionMode};
-
-		LocomotionMode = NewLocomotionMode;
-
-		NotifyLocomotionModeChanged(PreviousLocomotionMode);
-	}
-}
-
 void UAlsComponent::OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	// Use the character movement mode to set the locomotion mode to the right value. This allows you to have a
@@ -428,8 +421,20 @@ void UAlsComponent::OnMovementModeChanged(ACharacter* InCharacter, EMovementMode
 		break;
 
 	default:
-		// SetLocomotionMode(FGameplayTag::EmptyTag);
+		SetLocomotionMode(FGameplayTag::EmptyTag);
 		break;
+	}
+}
+
+void UAlsComponent::SetLocomotionMode(const FGameplayTag& NewLocomotionMode)
+{
+	if (LocomotionMode != NewLocomotionMode)
+	{
+		const auto PreviousLocomotionMode{LocomotionMode};
+
+		LocomotionMode = NewLocomotionMode;
+
+		NotifyLocomotionModeChanged(PreviousLocomotionMode);
 	}
 }
 
@@ -502,11 +507,11 @@ void UAlsComponent::SetDesiredAiming(const bool bNewDesiredAiming)
 
 		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, bDesiredAiming, this)
 
-		OnDesiredAimingChanged(!bNewDesiredAiming);
+		OnDesiredAimingChanged(!bDesiredAiming);
 
 		if (OwnerCharacter->GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredAiming(bNewDesiredAiming);
+			ServerSetDesiredAiming(bDesiredAiming);
 		}
 	}
 }
@@ -535,7 +540,7 @@ void UAlsComponent::SetDesiredRotationMode(const FGameplayTag& NewDesiredRotatio
 
 		if (OwnerCharacter->GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredRotationMode(NewDesiredRotationMode);
+			ServerSetDesiredRotationMode(DesiredRotationMode);
 		}
 	}
 }
@@ -662,7 +667,7 @@ void UAlsComponent::SetDesiredStance(const FGameplayTag& NewDesiredStance)
 
 		if (OwnerCharacter->GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredStance(NewDesiredStance);
+			ServerSetDesiredStance(DesiredStance);
 		}
 
 		ApplyDesiredStance();
@@ -708,10 +713,42 @@ void UAlsComponent::ApplyDesiredStance()
 
 void UAlsComponent::OnStartCrouch(const float HalfHeightAdjust, const float ScaledHalfHeightAdjust)
 {
+	auto* PredictionData{OwnerCharacter->GetCharacterMovement()->GetPredictionData_Client_Character()};
+
+	if (PredictionData != nullptr && OwnerCharacter->GetLocalRole() <= ROLE_SimulatedProxy &&
+		ScaledHalfHeightAdjust > 0.0f && OwnerCharacter->IsPlayingNetworkedRootMotionMontage())
+	{
+		// The code below essentially undoes the changes that will be made later at the end of the UCharacterMovementComponent::Crouch()
+		// function because they literally break network smoothing when crouching while the root motion montage is playing, causing the
+		// mesh to take an incorrect location for a while.
+
+		// TODO Check the need for this fix in future engine versions.
+
+		PredictionData->MeshTranslationOffset.Z += ScaledHalfHeightAdjust;
+		PredictionData->OriginalMeshTranslationOffset = PredictionData->MeshTranslationOffset;
+	}
+}
+
+void UAlsComponent::OnPostStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
 	SetStance(AlsStanceTags::Crouching);
 }
 
 void UAlsComponent::OnEndCrouch(const float HalfHeightAdjust, const float ScaledHalfHeightAdjust)
+{
+	auto* PredictionData{OwnerCharacter->GetCharacterMovement()->GetPredictionData_Client_Character()};
+
+	if (PredictionData != nullptr && OwnerCharacter->GetLocalRole() <= ROLE_SimulatedProxy &&
+		ScaledHalfHeightAdjust > 0.0f && OwnerCharacter->IsPlayingNetworkedRootMotionMontage())
+	{
+		// Same fix as in AAlsCharacter::OnStartCrouch().
+
+		PredictionData->MeshTranslationOffset.Z -= ScaledHalfHeightAdjust;
+		PredictionData->OriginalMeshTranslationOffset = PredictionData->MeshTranslationOffset;
+	}
+}
+
+void UAlsComponent::OnPostEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
 	SetStance(AlsStanceTags::Standing);
 }
@@ -744,7 +781,7 @@ void UAlsComponent::SetDesiredGait(const FGameplayTag& NewDesiredGait)
 
 		if (OwnerCharacter->GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetDesiredGait(NewDesiredGait);
+			ServerSetDesiredGait(DesiredGait);
 		}
 	}
 }
@@ -766,9 +803,8 @@ void UAlsComponent::SetGait(const FGameplayTag& NewGait)
 	}
 }
 
-void UAlsComponent::OnGaitChanged(const FGameplayTag& PreviousGait)
+void UAlsComponent::OnGaitChanged_Implementation(const FGameplayTag& PreviousGait)
 {
-	BpOnGaitChanged(PreviousGait);
 }
 
 void UAlsComponent::RefreshGait()
@@ -827,12 +863,11 @@ FGameplayTag UAlsComponent::CalculateActualGait(const FGameplayTag& MaxAllowedGa
 
 bool UAlsComponent::CanSprint() const
 {
-	// Determine if the character is currently able to sprint based on the rotation mode and input
-	// rotation. If the character is in the looking direction rotation mode, only allow sprinting
-	// if there is input and it is facing forward relative to the camera + or - 50 degrees.
+	// Determine if the character can sprint based on the rotation mode and input direction.
+	// If the character is in view direction rotation mode, only allow sprinting if there is
+	// input and if the input direction is aligned with the view direction within 50 degrees.
 
 	if (!LocomotionState.bHasInput || Stance != AlsStanceTags::Standing ||
-		// ReSharper disable once CppRedundantParentheses
 		(RotationMode == AlsRotationModeTags::Aiming && !Settings->bSprintHasPriorityOverAiming))
 	{
 		return false;
@@ -846,8 +881,8 @@ bool UAlsComponent::CanSprint() const
 
 	static constexpr auto ViewRelativeAngleThreshold{50.0f};
 
-	if (FMath::Abs(FRotator3f::NormalizeAxis(
-		LocomotionState.InputYawAngle - UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw))) < ViewRelativeAngleThreshold)
+	if (FMath::Abs(FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
+		LocomotionState.InputYawAngle - ViewState.Rotation.Yaw))) < ViewRelativeAngleThreshold)
 	{
 		return true;
 	}
@@ -869,7 +904,7 @@ void UAlsComponent::SetOverlayMode(const FGameplayTag& NewOverlayMode)
 
 		if (OwnerCharacter->GetLocalRole() == ROLE_AutonomousProxy)
 		{
-			ServerSetOverlayMode(NewOverlayMode);
+			ServerSetOverlayMode(OverlayMode);
 		}
 	}
 }
@@ -910,13 +945,62 @@ void UAlsComponent::NotifyLocomotionActionChanged(const FGameplayTag& PreviousLo
 
 void UAlsComponent::OnLocomotionActionChanged_Implementation(const FGameplayTag& PreviousLocomotionAction)
 {
-	BpOnLocomotionActionChanged(PreviousLocomotionAction);
 	OnLocomotionActionChangedEvent.Broadcast(PreviousLocomotionAction);
 }
 
 FRotator UAlsComponent::GetViewRotation() const
 {
 	return ViewState.Rotation;
+}
+
+void UAlsComponent::SetInputDirection(FVector NewInputDirection)
+{
+	NewInputDirection = NewInputDirection.GetSafeNormal();
+
+	COMPARE_ASSIGN_AND_MARK_PROPERTY_DIRTY(ThisClass, InputDirection, NewInputDirection, this);
+}
+
+void UAlsComponent::RefreshInput(const float DeltaTime)
+{
+	if (OwnerCharacter->GetLocalRole() >= ROLE_AutonomousProxy)
+	{
+		SetInputDirection(OwnerCharacter->GetCharacterMovement()->GetCurrentAcceleration() / OwnerCharacter->GetCharacterMovement()->GetMaxAcceleration());
+	}
+
+	LocomotionState.bHasInput = InputDirection.SizeSquared() > UE_KINDA_SMALL_NUMBER;
+
+	if (LocomotionState.bHasInput)
+	{
+		LocomotionState.InputYawAngle = UE_REAL_TO_FLOAT(UAlsMath::DirectionToAngleXY(InputDirection));
+	}
+}
+
+void UAlsComponent::SetReplicatedViewRotation(const FRotator& NewViewRotation)
+{
+	if (ReplicatedViewRotation != NewViewRotation)
+	{
+		ReplicatedViewRotation = NewViewRotation;
+
+		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, ReplicatedViewRotation, this)
+
+		// The character movement component already sends the view rotation to the
+		// server if the movement is replicated, so we don't have to do it ourselves.
+
+		if (!OwnerCharacter->IsReplicatingMovement() && OwnerCharacter->GetLocalRole() == ROLE_AutonomousProxy)
+		{
+			ServerSetReplicatedViewRotation(ReplicatedViewRotation);
+		}
+	}
+}
+
+void UAlsComponent::ServerSetReplicatedViewRotation_Implementation(const FRotator& NewViewRotation)
+{
+	SetReplicatedViewRotation(NewViewRotation);
+}
+
+void UAlsComponent::OnReplicated_ReplicatedViewRotation()
+{
+	CorrectViewNetworkSmoothing(ReplicatedViewRotation);
 }
 
 void UAlsComponent::CorrectViewNetworkSmoothing(const FRotator& NewViewRotation)
@@ -996,7 +1080,6 @@ void UAlsComponent::RefreshView(const float DeltaTime)
 
 	ViewState.PreviousYawAngle = UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw);
 
-	// ReSharper disable once CppRedundantParentheses
 	if ((OwnerCharacter->IsReplicatingMovement() && OwnerCharacter->GetLocalRole() >= ROLE_AutonomousProxy) || OwnerCharacter->IsLocallyControlled())
 	{
 		SetReplicatedViewRotation(OwnerCharacter->GetControlRotation().GetNormalized());
@@ -1058,16 +1141,9 @@ void UAlsComponent::RefreshViewNetworkSmoothing(const float DeltaTime)
 	}
 }
 
-void UAlsComponent::SetInputDirection(FVector NewInputDirection)
+void UAlsComponent::SetDesiredVelocityYawAngle(const float NewDesiredVelocityYawAngle)
 {
-	NewInputDirection = NewInputDirection.GetSafeNormal();
-
-	if (InputDirection != NewInputDirection)
-	{
-		InputDirection = NewInputDirection;
-
-		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass, InputDirection, this)
-	}
+	COMPARE_ASSIGN_AND_MARK_PROPERTY_DIRTY(ThisClass, DesiredVelocityYawAngle, NewDesiredVelocityYawAngle, this);
 }
 
 void UAlsComponent::RefreshLocomotionLocationAndRotation()
@@ -1080,13 +1156,13 @@ void UAlsComponent::RefreshLocomotionLocationAndRotation()
 	{
 		LocomotionState.Location = ActorTransform.GetLocation();
 		LocomotionState.RotationQuaternion = ActorTransform.GetRotation();
-		LocomotionState.Rotation = LocomotionState.RotationQuaternion.Rotator();
+		LocomotionState.Rotation = GetOwner()->GetActorRotation();
 	}
 	else if (OwnerCharacter->GetMesh()->IsUsingAbsoluteRotation())
 	{
 		LocomotionState.Location = ActorTransform.TransformPosition(OwnerCharacter->GetMesh()->GetRelativeLocation() - OwnerCharacter->GetBaseTranslationOffset());
 		LocomotionState.RotationQuaternion = ActorTransform.GetRotation();
-		LocomotionState.Rotation = LocomotionState.RotationQuaternion.Rotator();
+		LocomotionState.Rotation = GetOwner()->GetActorRotation();
 	}
 	else
 	{
@@ -1101,9 +1177,6 @@ void UAlsComponent::RefreshLocomotionLocationAndRotation()
 		LocomotionState.RotationQuaternion = SmoothTransform.GetRotation();
 		LocomotionState.Rotation = LocomotionState.RotationQuaternion.Rotator();
 	}
-
-	LocomotionState.YawSpeed = FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw) -
-		LocomotionState.PreviousYawAngle) / DeltaTime;
 }
 
 void UAlsComponent::RefreshLocomotionEarly()
@@ -1121,22 +1194,18 @@ void UAlsComponent::RefreshLocomotionEarly()
 		LocomotionState.SmoothTargetYawAngle = FRotator3f::NormalizeAxis(LocomotionState.SmoothTargetYawAngle +
 																		 MovementBase.DeltaRotation.Yaw);
 
-		auto NewRotation{OwnerCharacter->GetActorRotation()};
+		auto NewRotation{GetOwner()->GetActorRotation()};
 		NewRotation.Pitch += MovementBase.DeltaRotation.Pitch;
 		NewRotation.Yaw += MovementBase.DeltaRotation.Yaw;
 		NewRotation.Normalize();
 
-		OwnerCharacter->SetActorRotation(NewRotation);
+		GetOwner()->SetActorRotation(NewRotation);
 	}
 
 	RefreshLocomotionLocationAndRotation();
 
 	LocomotionState.PreviousVelocity = LocomotionState.Velocity;
 	LocomotionState.PreviousYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
-}
-
-void UAlsComponent::RefreshLocomotionLate(float DeltaTime)
-{
 }
 
 void UAlsComponent::RefreshLocomotion(const float DeltaTime)
@@ -1180,6 +1249,18 @@ void UAlsComponent::RefreshLocomotion(const float DeltaTime)
 	// ReSharper disable once CppRedundantParentheses
 	LocomotionState.bMoving = (LocomotionState.bHasInput && LocomotionState.bHasSpeed) ||
 		LocomotionState.Speed > Settings->MovingSpeedThreshold;
+}
+
+void UAlsComponent::RefreshLocomotionLate(const float DeltaTime)
+{
+	if (!LocomotionMode.IsValid() || LocomotionAction.IsValid())
+	{
+		RefreshLocomotionLocationAndRotation();
+		RefreshTargetYawAngleUsingLocomotionRotation();
+	}
+
+	LocomotionState.YawSpeed = FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
+								   LocomotionState.Rotation.Yaw - LocomotionState.PreviousYawAngle)) / DeltaTime;
 }
 
 bool UAlsComponent::CanJump()
@@ -1282,7 +1363,7 @@ void UAlsComponent::RefreshGroundedRotation(const float DeltaTime)
 	}
 
 	if (RotationMode == AlsRotationModeTags::VelocityDirection &&
-	    (LocomotionState.bHasInput || !LocomotionState.bRotationTowardsLastInputDirectionBlocked))
+		(LocomotionState.bHasInput || !LocomotionState.bRotationTowardsLastInputDirectionBlocked))
 	{
 		LocomotionState.bRotationTowardsLastInputDirectionBlocked = false;
 
@@ -1299,7 +1380,7 @@ void UAlsComponent::RefreshGroundedRotation(const float DeltaTime)
 			Gait == AlsGaitTags::Sprinting
 				? LocomotionState.VelocityYawAngle
 				: UE_REAL_TO_FLOAT(ViewState.Rotation.Yaw) +
-				  OwnerCharacter->GetMesh()->GetAnimInstance()->GetCurveValue(UAlsConstants::RotationYawOffsetCurveName())
+				OwnerCharacter->GetMesh()->GetAnimInstance()->GetCurveValue(UAlsConstants::RotationYawOffsetCurveName())
 		};
 
 		static constexpr auto TargetYawAngleRotationSpeed{500.0f};
@@ -1398,7 +1479,7 @@ void UAlsComponent::ApplyRotationYawSpeed(const float DeltaTime)
 
 		OwnerCharacter->SetActorRotation(NewRotation);
 
-		RefreshLocomotionLocationAndRotation(DeltaTime);
+		RefreshLocomotionLocationAndRotation();
 		RefreshTargetYawAngleUsingLocomotionRotation();
 	}
 }
@@ -1475,7 +1556,7 @@ void UAlsComponent::RefreshRotation(const float TargetYawAngle, const float Delt
 
 	OwnerCharacter->SetActorRotation(NewRotation);
 
-	RefreshLocomotionLocationAndRotation(DeltaTime);
+	RefreshLocomotionLocationAndRotation();
 }
 
 void UAlsComponent::RefreshRotationExtraSmooth(const float TargetYawAngle, const float DeltaTime,
@@ -1496,7 +1577,7 @@ void UAlsComponent::RefreshRotationExtraSmooth(const float TargetYawAngle, const
 
 	OwnerCharacter->SetActorRotation(NewRotation);
 
-	RefreshLocomotionLocationAndRotation(DeltaTime);
+	RefreshLocomotionLocationAndRotation();
 }
 
 void UAlsComponent::RefreshRotationInstant(const float TargetYawAngle, const ETeleportType Teleport)
@@ -1508,7 +1589,7 @@ void UAlsComponent::RefreshRotationInstant(const float TargetYawAngle, const ETe
 
 	OwnerCharacter->SetActorRotation(NewRotation, Teleport);
 
-	RefreshLocomotionLocationAndRotation(GetWorld()->GetDeltaSeconds());
+	RefreshLocomotionLocationAndRotation();
 }
 
 void UAlsComponent::RefreshTargetYawAngleUsingLocomotionRotation()

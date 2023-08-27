@@ -16,9 +16,9 @@
 
 void UAlsComponent::OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos)
 {
-	if (!DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::StateDisplayName()) &&
-		!DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDisplayName()) &&
-		!DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDisplayName()))
+	if (!DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDebugDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::StateDebugDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDebugDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDebugDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDebugDisplayName()))
 	{
 		return;
 	}
@@ -51,9 +51,9 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 	VerticalLocation += RowOffset;
 	MaxVerticalLocation = FMath::Max(MaxVerticalLocation, VerticalLocation);
 
-	if (!DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::StateDisplayName()) &&
-		!DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDisplayName()) &&
-		!DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDisplayName()))
+	if (!DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDebugDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::StateDebugDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDebugDisplayName()) && !DisplayInfo.IsDisplayOn(UAlsConstants::TracesDebugDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDebugDisplayName()))
 	{
 		VerticalLocation = MaxVerticalLocation;
 
@@ -64,7 +64,7 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 
 	static const auto CurvesHeaderText{FText::AsCultureInvariant(TEXT("Als.Curves (Shift + 1)"))};
 
-	if (DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDisplayName()))
+	if (DisplayInfo.IsDisplayOn(UAlsConstants::CurvesDebugDisplayName()))
 	{
 		DisplayDebugHeader(Canvas, CurvesHeaderText, FLinearColor::Green, Scale, HorizontalLocation, VerticalLocation);
 		DisplayDebugCurves(Canvas, Scale, HorizontalLocation, VerticalLocation);
@@ -84,7 +84,7 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 
 	static const auto StateHeaderText{FText::AsCultureInvariant(TEXT("Als.State (Shift + 2)"))};
 
-	if (DisplayInfo.IsDisplayOn(UAlsConstants::StateDisplayName()))
+	if (DisplayInfo.IsDisplayOn(UAlsConstants::StateDebugDisplayName()))
 	{
 		DisplayDebugHeader(Canvas, StateHeaderText, FLinearColor::Green, Scale, HorizontalLocation, VerticalLocation);
 		DisplayDebugState(Canvas, Scale, HorizontalLocation, VerticalLocation);
@@ -99,7 +99,7 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 
 	static const auto ShapesHeaderText{FText::AsCultureInvariant(TEXT("Als.Shapes (Shift + 3)"))};
 
-	if (DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDisplayName()))
+	if (DisplayInfo.IsDisplayOn(UAlsConstants::ShapesDebugDisplayName()))
 	{
 		DisplayDebugHeader(Canvas, ShapesHeaderText, FLinearColor::Green, Scale, HorizontalLocation, VerticalLocation);
 		DisplayDebugShapes(Canvas, Scale, HorizontalLocation, VerticalLocation);
@@ -114,7 +114,7 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 
 	static const auto TracesHeaderText{FText::AsCultureInvariant(TEXT("Als.Traces (Shift + 4)"))};
 
-	if (DisplayInfo.IsDisplayOn(UAlsConstants::TracesDisplayName()))
+	if (DisplayInfo.IsDisplayOn(UAlsConstants::TracesDebugDisplayName()))
 	{
 		DisplayDebugHeader(Canvas, TracesHeaderText, FLinearColor::Green, Scale, HorizontalLocation, VerticalLocation);
 		DisplayDebugTraces(Canvas, Scale, HorizontalLocation, VerticalLocation);
@@ -129,7 +129,7 @@ void UAlsComponent::DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& Displ
 
 	static const auto MantlingHeaderText{FText::AsCultureInvariant(TEXT("Als.Mantling (Shift + 5)"))};
 
-	if (DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDisplayName()))
+	if (DisplayInfo.IsDisplayOn(UAlsConstants::MantlingDebugDisplayName()))
 	{
 		DisplayDebugHeader(Canvas, MantlingHeaderText, FLinearColor::Green, Scale, HorizontalLocation, VerticalLocation);
 		DisplayDebugMantling(Canvas, Scale, HorizontalLocation, VerticalLocation);
@@ -255,7 +255,7 @@ void UAlsComponent::DisplayDebugState(const UCanvas* Canvas, const float Scale,
 	Text.Text = DesiredAimingText;
 	Text.Draw(Canvas->Canvas, {HorizontalLocation, VerticalLocation});
 
-	Text.Text = FText::AsCultureInvariant(FName::NameToDisplayString(UAlsUtility::BoolToString(bDesiredAiming), false));
+	Text.Text = FText::AsCultureInvariant(FName::NameToDisplayString(FString{UAlsUtility::BoolToString(bDesiredAiming)}, false));
 	Text.Draw(Canvas->Canvas, {HorizontalLocation + ColumnOffset, VerticalLocation});
 
 	VerticalLocation += RowOffset;

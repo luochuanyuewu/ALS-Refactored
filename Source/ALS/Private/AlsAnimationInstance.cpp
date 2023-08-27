@@ -1,7 +1,7 @@
 #include "AlsAnimationInstance.h"
 
 #include "AlsAnimationInstanceProxy.h"
-#include "AlsCharacter.h"
+#include "AlsComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Components/CapsuleComponent.h"
 #include "Curves/CurveFloat.h"

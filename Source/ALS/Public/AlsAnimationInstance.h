@@ -20,7 +20,7 @@
 #include "AlsAnimationInstance.generated.h"
 
 class UAlsLinkedAnimationInstance;
-class AAlsCharacter;
+class UAlsComponent;
 
 UCLASS()
 class ALS_API UAlsAnimationInstance : public UAnimInstance

@@ -6,7 +6,7 @@
 #include "AlsComponent.h"
 #include "Components/CapsuleComponent.h"
 
-
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AlsSimpleCharacter)
 // Sets default values
 AAlsSimpleCharacter::AAlsSimpleCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -81,19 +81,29 @@ bool AAlsSimpleCharacter::CanCrouch() const
 
 void AAlsSimpleCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
-	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 	if (UAlsComponent* Als = GetAlsComponent())
 	{
 		Als->OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	}
+	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->OnPostStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 	}
 }
 
 void AAlsSimpleCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
 {
-	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 	if (UAlsComponent* Als = GetAlsComponent())
 	{
 		Als->OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	}
+	
+	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		Als->OnPostEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 	}
 }
 

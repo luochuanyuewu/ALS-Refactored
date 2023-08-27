@@ -5,6 +5,8 @@
 
 #include "AlsCameraComponent.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AlsPlayerCameraManager)
+
 void AAlsPlayerCameraManager::UpdateViewTargetInternal(FTViewTarget& OutVT, float DeltaTime)
 {
 	if (OutVT.Target)

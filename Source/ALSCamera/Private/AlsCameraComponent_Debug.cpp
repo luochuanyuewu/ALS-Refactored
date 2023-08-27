@@ -3,7 +3,7 @@
 #include "DisplayDebugHelpers.h"
 #include "Animation/AnimInstance.h"
 #include "Engine/Canvas.h"
-#include "Engine/Engine.h"
+#include "GameFramework/HUD.h"
 #include "Utility/AlsCameraConstants.h"
 #include "Utility/AlsUtility.h"
 
@@ -11,9 +11,9 @@
 
 void UAlsCameraComponent::OnShowDebugInfo(AHUD *HUD, UCanvas *Canvas, const FDebugDisplayInfo &DisplayInfo, float &YL, float &YPos)
 {
-	if (!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraCurvesDisplayName()) &&
-		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraShapesDisplayName()) &&
-		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraTracesDisplayName()))
+	if (!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraCurvesDebugDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraShapesDebugDisplayName()) &&
+		!DisplayInfo.IsDisplayOn(UAlsCameraConstants::CameraTracesDebugDisplayName()))
 	{
 		return;
 	}

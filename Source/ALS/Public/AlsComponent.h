@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "GameFramework/Character.h"
-#include "Settings/AlsMantlingSettings.h"
 #include "State/AlsLocomotionState.h"
 #include "State/AlsMovementBaseState.h"
 #include "State/AlsRagdollingState.h"
@@ -10,10 +9,13 @@
 #include "Utility/AlsGameplayTags.h"
 #include "AlsComponent.generated.h"
 
+struct FAlsMantlingParameters;
+struct FAlsMantlingTraceSettings;
 class UAlsCharacterMovementComponent;
 class UAlsCharacterSettings;
 class UAlsMovementSettings;
 class UAlsAnimationInstance;
+class UAlsMantlingSettings;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOverlayModeChangedSignature,const FGameplayTag&, PreviousOverlayMode);
 
@@ -97,6 +99,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient, Replicated)
 	FVector_NetQuantizeNormal InputDirection;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character",
+	Transient, Replicated, Meta = (ClampMin = -180, ClampMax = 180, ForceUnits = "deg"))
+	float DesiredVelocityYawAngle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
 	FAlsLocomotionState LocomotionState;
@@ -288,17 +294,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Als Character")
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
 
+	UFUNCTION(BlueprintCallable, Category = "Als Character")
+	virtual void OnPostStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
+
 	// call from ownerCharacter.
 	UFUNCTION(BlueprintCallable, Category = "Als Character")
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
 
+	UFUNCTION(BlueprintCallable, Category = "Als Character")
+	virtual void OnPostEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust);
+
 public:
 	const FGameplayTag& GetStance() const;
 
-private:
+protected:
 	void SetStance(const FGameplayTag& NewStance);
 
-protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnStanceChanged(const FGameplayTag& PreviousStance);
 	virtual void OnStanceChanged_Implementation(const FGameplayTag& PreviousStance);
@@ -321,13 +332,12 @@ private:
 public:
 	const FGameplayTag& GetGait() const;
 
-private:
+protected:
 	void SetGait(const FGameplayTag& NewGait);
 
-protected:
-	virtual void OnGaitChanged(const FGameplayTag& PreviousGait);
-	UFUNCTION(BlueprintImplementableEvent, Category = "Als Character", meta = (DisplayName = "On Gait Changed"))
-	void BpOnGaitChanged(const FGameplayTag& PreviousGait);
+	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
+	void OnGaitChanged(const FGameplayTag& PreviousGait);
+	virtual void OnGaitChanged_Implementation(const FGameplayTag& PreviousGait);
 
 private:
 	void RefreshGait();
@@ -367,6 +377,7 @@ public:
 
 	void SetLocomotionAction(const FGameplayTag& NewLocomotionAction);
 
+private:
 	void NotifyLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
 
 protected:
@@ -374,6 +385,13 @@ protected:
 	void OnLocomotionActionChanged(const FGameplayTag& PreviousLocomotionAction);
 	virtual void OnLocomotionActionChanged_Implementation(const FGameplayTag& PreviousLocomotionAction);
 
+public:
+	const FVector& GetInputDirection() const;
+
+protected:
+	void SetInputDirection(FVector NewInputDirection);
+
+	virtual void RefreshInput(float DeltaTime);
 
 	// View
 
@@ -404,12 +422,10 @@ private:
 	// Locomotion
 
 public:
-	const FVector& GetInputDirection() const;
-
 	const FAlsLocomotionState& GetLocomotionState() const;
 
 private:
-	void SetInputDirection(FVector NewInputDirection);
+	void SetDesiredVelocityYawAngle(float NewDesiredVelocityYawAngle);
 
 	void RefreshLocomotionLocationAndRotation();
 
@@ -517,7 +533,7 @@ public:
 	bool IsMantlingAllowedToStart() const;
 	virtual bool IsMantlingAllowedToStart_Implementation() const;
 
-	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
+	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (ReturnDisplayName = "Success"))
 	bool TryStartMantlingGrounded();
 
 private:
@@ -571,7 +587,6 @@ private:
 	void MulticastStartRagdolling();
 	virtual void MulticastStartRagdolling_Implementation();
 
-
 	void StartRagdollingImplementation();
 
 protected:
@@ -582,7 +597,7 @@ protected:
 public:
 	bool IsRagdollingAllowedToStop() const;
 
-	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character")
+	UFUNCTION(BlueprintCallable, Category = "ALS|Als Character", Meta = (ReturnDisplayName = "Success"))
 	bool TryStopRagdolling();
 
 private:

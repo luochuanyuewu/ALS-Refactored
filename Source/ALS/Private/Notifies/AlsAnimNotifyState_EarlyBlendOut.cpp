@@ -31,11 +31,11 @@ void UAlsAnimNotifyState_EarlyBlendOut::NotifyTick(USkeletalMeshComponent *Mesh,
 	// const auto* Character{IsValid(AnimationInstance) ? Cast<AAlsCharacter>(Mesh->GetOwner()) : nullptr};
 	const UAlsComponent *AlsComponent{IsValid(AnimationInstance) ? UAlsComponent::FindAlsComponent(Mesh->GetOwner()) : nullptr};
 
-	if (IsValid(Character) &&
-		((bCheckInput && Character->GetLocomotionState().bHasInput) ||
-		 (bCheckLocomotionMode && Character->GetLocomotionMode() == LocomotionModeEquals) ||
-		 (bCheckRotationMode && Character->GetRotationMode() == RotationModeEquals) ||
-		 (bCheckStance && Character->GetStance() == StanceEquals)))
+	if (IsValid(AlsComponent) &&
+		((bCheckInput && AlsComponent->GetLocomotionState().bHasInput) ||
+		 (bCheckLocomotionMode && AlsComponent->GetLocomotionMode() == LocomotionModeEquals) ||
+		 (bCheckRotationMode && AlsComponent->GetRotationMode() == RotationModeEquals) ||
+		 (bCheckStance && AlsComponent->GetStance() == StanceEquals)))
 	{
 		AnimationInstance->Montage_Stop(BlendOutDuration, Montage);
 	}
