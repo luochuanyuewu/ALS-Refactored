@@ -30,7 +30,7 @@ AAlsSimpleCharacter::AAlsSimpleCharacter(const FObjectInitializer& ObjectInitial
 	// This will prevent the editor from combining component details with actor details.
 	// Component details can still be accessed from the actor's component hierarchy.
 
-	#if WITH_EDITOR
+#if WITH_EDITOR
 	StaticClass()->FindPropertyByName(TEXT("Mesh"))->SetPropertyFlags(CPF_DisableEditOnInstance);
 	StaticClass()->FindPropertyByName(TEXT("CapsuleComponent"))->SetPropertyFlags(CPF_DisableEditOnInstance);
 	StaticClass()->FindPropertyByName(TEXT("CharacterMovement"))->SetPropertyFlags(CPF_DisableEditOnInstance);
@@ -41,9 +41,9 @@ AAlsSimpleCharacter::AAlsSimpleCharacter(const FObjectInitializer& ObjectInitial
 bool AAlsSimpleCharacter::CanEditChange(const FProperty* Property) const
 {
 	return Super::CanEditChange(Property) &&
-		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationPitch) &&
-		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationYaw) &&
-		   Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationRoll);
+		Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationPitch) &&
+		Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationYaw) &&
+		Property->GetFName() != GET_MEMBER_NAME_CHECKED(ThisClass, bUseControllerRotationRoll);
 }
 #endif
 
@@ -71,11 +71,11 @@ void AAlsSimpleCharacter::BeginPlay()
 
 bool AAlsSimpleCharacter::CanCrouch() const
 {
-	 //This allows to execute the ACharacter::Crouch() function properly when bIsCrouched is true.
-	 if (UAlsComponent* Als = GetAlsComponent())
-	 {
-	 	return bIsCrouched || Super::CanCrouch();
-	 }
+	//This allows to execute the ACharacter::Crouch() function properly when bIsCrouched is true.
+	if (UAlsComponent* Als = GetAlsComponent())
+	{
+		return bIsCrouched || Super::CanCrouch();
+	}
 	return Super::CanCrouch();
 }
 
@@ -98,7 +98,7 @@ void AAlsSimpleCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHe
 	{
 		Als->OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 	}
-	
+
 	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
 
 	if (UAlsComponent* Als = GetAlsComponent())
@@ -120,7 +120,7 @@ void AAlsSimpleCharacter::OnRep_ReplicatedBasedMovement()
 {
 	if (UAlsComponent* Als = GetAlsComponent())
 	{
-		Als->OnRep_ReplicatedBasedMovement();
+		Als->OnRep_ReplicatedBasedMovement(ReplicatedBasedMovement);
 	}
 	Super::OnRep_ReplicatedBasedMovement();
 }
@@ -143,18 +143,17 @@ void AAlsSimpleCharacter::Restart()
 	}
 }
 
-bool AAlsSimpleCharacter::CanJumpInternal_Implementation() const
-{
-
-	if (UAlsComponent* Als = GetAlsComponent())
-	{
-		if (Als->CanJump())
-		{
-			return true;
-		}
-	}
-	return Super::CanJumpInternal_Implementation();
-}
+// bool AAlsSimpleCharacter::CanJumpInternal_Implementation() const
+// {
+// 	if (UAlsComponent* Als = GetAlsComponent())
+// 	{
+// 		if (Als->CanJump())
+// 		{
+// 			return true;
+// 		}
+// 	}
+// 	return Super::CanJumpInternal_Implementation();
+// }
 
 void AAlsSimpleCharacter::OnJumped_Implementation()
 {
@@ -182,4 +181,3 @@ void AAlsSimpleCharacter::FaceRotation(FRotator NewControlRotation, float DeltaT
 		Super::FaceRotation(NewControlRotation, DeltaTime);
 	}
 }
-

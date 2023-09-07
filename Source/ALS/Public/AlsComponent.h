@@ -17,13 +17,13 @@ class UAlsMovementSettings;
 class UAlsAnimationInstance;
 class UAlsMantlingSettings;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOverlayModeChangedSignature,const FGameplayTag&, PreviousOverlayMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOverlayModeChangedSignature, const FGameplayTag&, PreviousOverlayMode);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLocomotionModeChangedSignature,const FGameplayTag&, PreviousLocomotionMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLocomotionModeChangedSignature, const FGameplayTag&, PreviousLocomotionMode);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLocomotionActionChangedSignature,const FGameplayTag&, PreviousLocomotionAction);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FLocomotionActionChangedSignature, const FGameplayTag&, PreviousLocomotionAction);
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMantlingStartedSignature,const FAlsMantlingParameters&, Parameters);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMantlingStartedSignature, const FAlsMantlingParameters&, Parameters);
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSimpleSignature);
 
@@ -104,7 +104,7 @@ protected:
 	FVector_NetQuantizeNormal InputDirection;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character",
-	Transient, Replicated, Meta = (ClampMin = -180, ClampMax = 180, ForceUnits = "deg"))
+		Transient, Replicated, Meta = (ClampMin = -180, ClampMax = 180, ForceUnits = "deg"))
 	float DesiredVelocityYawAngle;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State|Als Character", Transient)
@@ -158,10 +158,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Als Event")
 	FSimpleSignature OnRagdollingStartedEvent;
-	
+
 	UPROPERTY(BlueprintAssignable, Category="Als Event")
 	FSimpleSignature OnRagdollingEndedEvent;
-	
 
 protected:
 	virtual void BeginPlay() override;
@@ -172,7 +171,7 @@ public:
 	virtual void PostNetReceiveLocationAndRotation();
 
 	//call from owner.
-	virtual void OnRep_ReplicatedBasedMovement();
+	virtual void OnRep_ReplicatedBasedMovement(FBasedMovementInfo& ReplicatedBasedMovement);
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -218,7 +217,7 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Als Character")
 	void OnLocomotionModeChanged(const FGameplayTag& PreviousLocomotionMode);
 	virtual void OnLocomotionModeChanged_Implementation(const FGameplayTag& PreviousLocomotionMode);
-	
+
 	// Desired Aiming
 
 public:
@@ -282,7 +281,6 @@ private:
 	UFUNCTION(Server, Reliable)
 	void ServerSetDesiredStance(const FGameplayTag& NewDesiredStance);
 	virtual void ServerSetDesiredStance_Implementation(const FGameplayTag& NewDesiredStance);
-
 
 protected:
 	virtual void ApplyDesiredStance();
@@ -444,7 +442,7 @@ private:
 public:
 	// call from owner Character
 	UFUNCTION(BlueprintPure, Category="Als Character")
-	virtual bool CanJump();
+	virtual bool CanJump() const;
 
 	// call from owner Character
 	UFUNCTION(BlueprintCallable, Category="Als Character")
@@ -522,7 +520,7 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStartRolling(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
 	virtual void MulticastStartRolling_Implementation(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
-	
+
 	void StartRollingImplementation(UAnimMontage* Montage, float PlayRate, float StartYawAngle, float TargetYawAngle);
 
 	void RefreshRolling(float DeltaTime);
@@ -551,7 +549,7 @@ private:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStartMantling(const FAlsMantlingParameters& Parameters);
 	virtual void MulticastStartMantling_Implementation(const FAlsMantlingParameters& Parameters);
-	
+
 	void StartMantlingImplementation(const FAlsMantlingParameters& Parameters);
 
 protected:
@@ -627,7 +625,6 @@ protected:
 	void OnRagdollingEnded();
 	virtual void OnRagdollingEnded_Implementation();
 
-
 private:
 	void SetRagdollTargetLocation(const FVector& NewTargetLocation);
 
@@ -644,9 +641,8 @@ private:
 
 public:
 	static void OnShowDebugInfo(AHUD* HUD, UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& YL, float& YPos);
-	
-	virtual void DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& Unused, float& VerticalLocation);
 
+	virtual void DisplayDebug(UCanvas* Canvas, const FDebugDisplayInfo& DisplayInfo, float& Unused, float& VerticalLocation);
 
 private:
 	static void DisplayDebugHeader(const UCanvas* Canvas, const FText& HeaderText, const FLinearColor& HeaderColor,
@@ -666,8 +662,6 @@ private:
 #if WITH_EDITOR
 	virtual EDataValidationResult IsDataValid(TArray<FText>& ValidationErrors) override;
 #endif
-	
-	
 };
 
 inline const FGameplayTag& UAlsComponent::GetViewMode() const
@@ -739,4 +733,3 @@ inline const FAlsLocomotionState& UAlsComponent::GetLocomotionState() const
 {
 	return LocomotionState;
 }
-

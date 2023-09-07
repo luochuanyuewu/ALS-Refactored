@@ -41,7 +41,7 @@ protected:
 	virtual void OnRep_ReplicatedBasedMovement() override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void Restart() override;
-	virtual bool CanJumpInternal_Implementation() const override;
+	// virtual bool CanJumpInternal_Implementation() const override;
 	virtual void OnJumped_Implementation() override;
 	virtual FRotator GetViewRotation() const override;
 	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime) override final;

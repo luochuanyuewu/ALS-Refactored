@@ -53,32 +53,35 @@ void UAlsComponent::OnRegister()
 	OwnerCharacter = Cast<ACharacter>(GetOwner());
 
 	if (OwnerCharacter)
+	{
 		AlsCharacterMovement = Cast<UAlsCharacterMovementComponent>(OwnerCharacter->GetMovementComponent());
-	// Set some default values here to ensure that the animation instance and the
-	// camera component can read the most up-to-date values during their initialization.
+		// Set some default values here to ensure that the animation instance and the
+		// camera component can read the most up-to-date values during their initialization.
 
-	RotationMode = bDesiredAiming ? AlsRotationModeTags::Aiming : DesiredRotationMode;
-	Stance = DesiredStance;
-	Gait = DesiredGait;
+		RotationMode = bDesiredAiming ? AlsRotationModeTags::Aiming : DesiredRotationMode;
+		Stance = DesiredStance;
+		Gait = DesiredGait;
 
-	SetReplicatedViewRotation(OwnerCharacter->GetControlRotation());
+		SetReplicatedViewRotation(OwnerCharacter->GetControlRotation());
 
-	ViewState.NetworkSmoothing.InitialRotation = ReplicatedViewRotation;
-	ViewState.NetworkSmoothing.Rotation = ReplicatedViewRotation;
-	ViewState.Rotation = ReplicatedViewRotation;
-	ViewState.PreviousYawAngle = UE_REAL_TO_FLOAT(ReplicatedViewRotation.Yaw);
+		ViewState.NetworkSmoothing.InitialRotation = ReplicatedViewRotation;
+		ViewState.NetworkSmoothing.Rotation = ReplicatedViewRotation;
+		ViewState.Rotation = ReplicatedViewRotation;
+		ViewState.PreviousYawAngle = UE_REAL_TO_FLOAT(ReplicatedViewRotation.Yaw);
 
-	const auto& ActorTransform{OwnerCharacter->GetActorTransform()};
+		const auto& ActorTransform{OwnerCharacter->GetActorTransform()};
 
-	LocomotionState.Location = ActorTransform.GetLocation();
-	LocomotionState.RotationQuaternion = ActorTransform.GetRotation();
-	LocomotionState.Rotation = OwnerCharacter->GetActorRotation();
-	LocomotionState.PreviousYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
+		LocomotionState.Location = ActorTransform.GetLocation();
+		LocomotionState.RotationQuaternion = ActorTransform.GetRotation();
+		LocomotionState.Rotation = OwnerCharacter->GetActorRotation();
+		LocomotionState.PreviousYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
 
-	RefreshTargetYawAngleUsingLocomotionRotation();
+		RefreshTargetYawAngleUsingLocomotionRotation();
 
-	LocomotionState.InputYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
-	LocomotionState.VelocityYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
+		LocomotionState.InputYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
+		LocomotionState.VelocityYawAngle = UE_REAL_TO_FLOAT(LocomotionState.Rotation.Yaw);
+	}
+
 
 	Super::OnRegister();
 }
@@ -91,7 +94,9 @@ UAlsComponent* UAlsComponent::FindAlsComponent(const AActor* Actor)
 bool UAlsComponent::K2_FindAlsComponent(const AActor* Actor, UAlsComponent*& Instance)
 {
 	if (Actor == nullptr)
+	{
 		return false;
+	}
 	Instance = FindAlsComponent(Actor);
 	return Instance != nullptr;
 }
@@ -104,7 +109,17 @@ void UAlsComponent::BeginPlay()
 
 		OwnerCharacter->GetMesh()->AddTickPrerequisiteActor(GetOwner());
 
-		AlsCharacterMovement->OnPhysicsRotation.AddUObject(this, &ThisClass::CharacterMovement_OnPhysicsRotation);
+		if (AlsCharacterMovement == nullptr)
+		{
+			AlsCharacterMovement = Cast<UAlsCharacterMovementComponent>(OwnerCharacter->GetMovementComponent());
+
+			checkf(AlsCharacterMovement, TEXT("Als Component requires AlsCharacterMovementComponent!"))
+		}
+
+		if (AlsCharacterMovement != nullptr && !AlsCharacterMovement->OnPhysicsRotation.IsBoundToObject(this))
+		{
+			AlsCharacterMovement->OnPhysicsRotation.AddUObject(this, &ThisClass::CharacterMovement_OnPhysicsRotation);
+		}
 
 		// Pass current movement settings to the movement component.
 
@@ -200,7 +215,7 @@ void UAlsComponent::PostNetReceiveLocationAndRotation()
 	}
 }
 
-void UAlsComponent::OnRep_ReplicatedBasedMovement()
+void UAlsComponent::OnRep_ReplicatedBasedMovement(FBasedMovementInfo& ReplicatedBasedMovement)
 {
 	// ACharacter::OnRep_ReplicatedBasedMovement() is only called on simulated proxies, so there is no need to check roles here.
 
@@ -216,13 +231,11 @@ void UAlsComponent::OnRep_ReplicatedBasedMovement()
 		MovementBaseUtility::GetMovementBaseTransform(OwnerCharacter->GetReplicatedBasedMovement().MovementBase, OwnerCharacter->GetReplicatedBasedMovement().BoneName,
 		                                              MovementBaseLocation, MovementBaseRotation);
 
-		//TODO 金生
-		// OwnerCharacter->ReplicatedBasedMovement.Rotation = (MovementBaseRotation.Inverse() * GetActorQuat()).Rotator();
+		ReplicatedBasedMovement.Rotation = (MovementBaseRotation.Inverse() * OwnerCharacter->GetActorQuat()).Rotator();
 	}
 	else
 	{
-		//TODO 金生
-		// ReplicatedBasedMovement.Rotation = OwnerCharacter->GetActorRotation();
+		ReplicatedBasedMovement.Rotation = OwnerCharacter->GetActorRotation();
 	}
 
 	// Super::OnRep_ReplicatedBasedMovement();
@@ -1186,13 +1199,13 @@ void UAlsComponent::RefreshLocomotionEarly()
 		// Offset the rotations (the actor's rotation too) to keep them relative to the movement base.
 
 		LocomotionState.TargetYawAngle = FRotator3f::NormalizeAxis(LocomotionState.TargetYawAngle +
-																   MovementBase.DeltaRotation.Yaw);
+			MovementBase.DeltaRotation.Yaw);
 
 		LocomotionState.ViewRelativeTargetYawAngle = FRotator3f::NormalizeAxis(LocomotionState.ViewRelativeTargetYawAngle +
-																			   MovementBase.DeltaRotation.Yaw);
+			MovementBase.DeltaRotation.Yaw);
 
 		LocomotionState.SmoothTargetYawAngle = FRotator3f::NormalizeAxis(LocomotionState.SmoothTargetYawAngle +
-																		 MovementBase.DeltaRotation.Yaw);
+			MovementBase.DeltaRotation.Yaw);
 
 		auto NewRotation{GetOwner()->GetActorRotation()};
 		NewRotation.Pitch += MovementBase.DeltaRotation.Pitch;
@@ -1260,10 +1273,10 @@ void UAlsComponent::RefreshLocomotionLate(const float DeltaTime)
 	}
 
 	LocomotionState.YawSpeed = FRotator3f::NormalizeAxis(UE_REAL_TO_FLOAT(
-								   LocomotionState.Rotation.Yaw - LocomotionState.PreviousYawAngle)) / DeltaTime;
+		LocomotionState.Rotation.Yaw - LocomotionState.PreviousYawAngle)) / DeltaTime;
 }
 
-bool UAlsComponent::CanJump()
+bool UAlsComponent::CanJump() const
 {
 	return Stance == AlsStanceTags::Standing && !LocomotionAction.IsValid() &&
 		LocomotionMode == AlsLocomotionModeTags::Grounded;

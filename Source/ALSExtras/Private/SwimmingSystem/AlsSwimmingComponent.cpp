@@ -9,6 +9,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Utility/AlsExtraGameplayTags.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(AlsSwimmingComponent)
 
 // Sets default values for this component's properties
 UAlsSwimmingComponent::UAlsSwimmingComponent()
@@ -43,19 +44,19 @@ void UAlsSwimmingComponent::BeginPlay()
 	OwnerCharacter->GetCharacterMovement()->Buoyancy = DefaultBuoyancy;
 	AlsComponent = UAlsComponent::FindAlsComponent(OwnerCharacter);
 
-	OwnerCharacter->MovementModeChangedDelegate.AddDynamic(this,&ThisClass::OnMovementModeChanged);
-	AlsComponent->OnLocomotionModeChangedEvent.AddDynamic(this,&ThisClass::OnLocomotionModeChanged);
+	OwnerCharacter->MovementModeChangedDelegate.AddDynamic(this, &ThisClass::OnMovementModeChanged);
+	AlsComponent->OnLocomotionModeChangedEvent.AddDynamic(this, &ThisClass::OnLocomotionModeChanged);
 }
 
 void UAlsSwimmingComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (OwnerCharacter)
 	{
-		OwnerCharacter->MovementModeChangedDelegate.RemoveDynamic(this,&ThisClass::OnMovementModeChanged);
+		OwnerCharacter->MovementModeChangedDelegate.RemoveDynamic(this, &ThisClass::OnMovementModeChanged);
 	}
 	if (AlsComponent)
 	{
-		AlsComponent->OnLocomotionModeChangedEvent.RemoveDynamic(this,&ThisClass::OnLocomotionModeChanged);
+		AlsComponent->OnLocomotionModeChangedEvent.RemoveDynamic(this, &ThisClass::OnLocomotionModeChanged);
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -76,7 +77,7 @@ void UAlsSwimmingComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	}
 
 	TickSwimming(DeltaTime);
-	
+
 	// ...
 }
 
@@ -121,4 +122,3 @@ void UAlsSwimmingComponent::OnMovementModeChanged(ACharacter* InCharacter, EMove
 		break;
 	}
 }
-
